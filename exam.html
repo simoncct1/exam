@@ -54,7 +54,11 @@
         onLadder = false,
         ladders,
         shell,
-        shellSpeed = 500;
+        shellSpeed = 500,
+        heartOutlines = [],
+        hearts = [],
+        maxHearts = 3,
+        vulnerableTime = 1000;
 
       var game = new Phaser.Game(config);
 
@@ -69,6 +73,8 @@
         this.load.image("baddie", "baddie.jpg");
         this.load.image("ladder", "ladder.png");
         this.load.image("shell", "shell.png");
+        this.load.image("heart", "heart.png");
+        this.load.image("heart-filled", "heart-filled.png");
       }
 
       function create() {
@@ -84,17 +90,16 @@
         platforms.create(750, 140, "ground");
 
         player = this.physics.add.sprite(100, 350, "hero");
-
         player.setCollideWorldBounds(true);
-
         player.setBounce(0);
-
         player.body.maxVelocity.x = 200;
         player.body.maxVelocity.y = 500;
+        player.invulnerable = false;
+        player.hearts = maxHearts;
 
         cursors = this.input.keyboard.createCursorKeys();
 
-        shell = this.physics.add.sprite(200, 350, "shell");
+        shell = this.physics.add.sprite(700, 350, "shell");
 
         coins = this.physics.add.group({
           key: "coin",
@@ -129,6 +134,16 @@
         scoreCoin.setOrigin(0.5, 0.5);
         scoreCoin.scaleX = 0.5;
         scoreCoin.scaleY = 0.5;
+
+        var heartOutline1 = this.add.sprite(760, 38, "heart"),
+          heartOutline2 = this.add.sprite(720, 38, "heart"),
+          heartOutline3 = this.add.sprite(680, 38, "heart");
+        heartOutlines = [heartOutline1, heartOutline2, heartOutline3];
+        heart1 = this.add.sprite(760, 38, "heart-filled");
+        heart2 = this.add.sprite(720, 38, "heart-filled");
+        heart3 = this.add.sprite(680, 38, "heart-filled");
+        hearts = [heart1, heart2, heart3];
+
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(coins, platforms);
         this.physics.add.collider(player, ladders, null, checkLadderTop, this);
@@ -211,9 +226,8 @@
       }
 
       function hitBaddie(player, baddie) {
-        if (baddie.body.touching.up) {
+        if (baddie.body.touching.up && !baddie.hit) {
           baddie.disableBody(false, false);
-
           player.setVelocityY(jumpVelocity);
 
           var tween = this.tweens.add({
@@ -228,24 +242,95 @@
             },
           });
         } else {
-          player.disableBody(false, false);
+          if (!player.invulnerable) {
+            player.invulnerable = true;
 
-          var tween = this.tweens.add({
-            targets: player,
-            alpha: 0.3,
-            scaleX: 1.1,
-            scaleY: 1.1,
-            angle: 90,
-            x: player.x - 20,
-            y: player.y - 20,
-            ease: "Linear",
-            duration: 200,
-            onComplete: function () {
-              restartGame(this);
-            },
-            onCompleteScope: this,
-          });
+            var currentHeartCount = player.hearts,
+              currentHeart = hearts[currentHeartCount - 1],
+              currentHeartOutline = heartOutlines[currentHeartCount - 1];
+
+            var heartFade = this.tweens.add({
+              targets: currentHeart,
+              alpha: 0,
+              scaleX: 0,
+              scaleY: 0,
+              ease: "Linear",
+              duration: 200,
+            });
+
+            var heartsTimeline = this.tweens.createTimeline();
+
+            heartsTimeline.add({
+              targets: currentHeartOutline,
+              scaleX: 0.5,
+              scaleY: 0.5,
+              ease: "Power1",
+              duration: 200,
+            });
+
+            heartsTimeline.add({
+              targets: currentHeartOutline,
+              scaleX: 1,
+              scaleY: 1,
+              ease: "Power1",
+              duration: 200,
+            });
+
+            heartsTimeline.play();
+
+            player.hearts -= 1;
+
+            if (player.hearts <= 0) {
+              player.disableBody(false, false);
+
+              var tween = this.tweens.add({
+                targets: player,
+                alpha: 0.3,
+                scaleX: 1.1,
+                scaleY: 1.1,
+                angle: 90,
+                x: player.x - 20,
+                y: player.y - 20,
+                ease: "Linear",
+                duration: 200,
+                onComplete: function () {
+                  restartGame(this);
+                },
+                onCompleteScope: this,
+              });
+            } else {
+              player.body.velocity.x = 0;
+              player.body.velocity.y = -220;
+
+              var tween = this.tweens.add({
+                targets: player,
+                alpha: 0.3,
+                ease: "Linear",
+                duration: 200,
+                onCompleteScope: this,
+              });
+
+              var timer = this.time.delayedCall(
+                vulnerableTime,
+                playerVulnerable,
+                [this]
+              );
+            }
+          }
         }
+      }
+
+      function playerVulnerable(game) {
+        var death = game.tweens.add({
+          targets: player,
+          alpha: 1,
+          ease: "Linear",
+          duration: 200,
+          onComplete: function () {
+            player.invulnerable = false;
+          },
+          onCompleteScope: this,
+        });
       }
       function restartGame(game) {
         game.scene.restart();
