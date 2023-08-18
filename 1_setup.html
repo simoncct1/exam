@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Improved Touch Controls - Phaser Platformer series</title>
+    <title>Examen DCU</title>
     <script src="js/phaser.min.js"></script>
     <link rel="stylesheet" href="css/screen.css" />
   </head>
@@ -52,7 +52,9 @@
         thumbSizeOffset = 60,
         startX,
         onLadder = false,
-        ladders;
+        ladders,
+        shell,
+        shellSpeed = 500;
 
       var game = new Phaser.Game(config);
 
@@ -66,6 +68,7 @@
         this.load.image("touch-knob", "touch-knob.png");
         this.load.image("baddie", "baddie.jpg");
         this.load.image("ladder", "ladder.png");
+        this.load.image("shell", "shell.png");
       }
 
       function create() {
@@ -90,6 +93,8 @@
         player.body.maxVelocity.y = 500;
 
         cursors = this.input.keyboard.createCursorKeys();
+
+        shell = this.physics.add.sprite(200, 350, "shell");
 
         coins = this.physics.add.group({
           key: "coin",
@@ -127,15 +132,68 @@
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(coins, platforms);
         this.physics.add.collider(player, ladders, null, checkLadderTop, this);
+        this.physics.add.collider(shell, platforms);
+        this.physics.add.collider(player, shell, shellHit, null, this);
+        this.physics.add.overlap(shell, baddie, shellHitBaddie, null, this);
         this.physics.add.overlap(player, coins, collectCoin, null, this);
         this.physics.add.overlap(player, baddie, hitBaddie, null, this);
         buildTouchSlider(this);
       }
+
+      function shellHit(player, shell) {
+        var threshold = shell.x + shell.width / 2,
+          playerX = player.x + player.width / 2;
+
+        if (shell.body.touching.up) {
+          if (playerX < threshold) shell.body.velocity.x = shellSpeed;
+          else shell.body.velocity.x = -shellSpeed;
+        }
+
+        if (shell.body.touching.left) {
+          shell.body.velocity.x = shellSpeed;
+        }
+
+        if (shell.body.touching.right) {
+          shell.body.velocity.x = -shellSpeed;
+        }
+
+        player.body.velocity.y = -200;
+      }
+      function shellHitBaddie(shell, baddie) {
+        if (!baddie.hit) {
+          baddie.disableBody(false, false);
+
+          var tween = this.tweens.add({
+            targets: baddie,
+            alpha: 0.3,
+            scaleX: 1.5,
+            scaleY: 1.5,
+            ease: "Linear",
+            duration: 200,
+            onComplete: function () {
+              destroyGameObject(baddie);
+            },
+          });
+
+          shell.disableBody(false, false);
+
+          var tween2 = this.tweens.add({
+            targets: shell,
+            alpha: 0.3,
+            scaleX: 2,
+            scaleY: 2,
+            y: "-=100",
+            rotation: -360,
+            ease: "Linear",
+            duration: 200,
+            onComplete: function () {
+              destroyGameObject(shell);
+            },
+          });
+        }
+      }
+
       function checkLadderTop(player, ladder) {
-        /* We check here if our player is higher up than the ladder i.e. if the player is on top of the ladder
-    the sprites are positioned from their centres, so we have to add or subtract half their height to find the heroes feet and the top of the ladder. 
-    With the player we add half the height so we are checking the positon of their feet. With the ladder we add half the height so we are checking the top of the ladder. We also round the two values differently, floor for the player to give us the smallest number possible and ceil for the ladder height to give us the highest number possible. This deals with any subpixel values.
-    */
         if (
           Math.floor(player.y + player.height / 2) <=
           Math.ceil(ladder.y - ladder.height / 2)
