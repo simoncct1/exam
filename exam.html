@@ -58,7 +58,13 @@
         heartOutlines = [],
         hearts = [],
         maxHearts = 3,
-        vulnerableTime = 1000;
+        invicibility,
+        emitter,
+        superPlayerSpeed = 400,
+        vulnerableTime = 1000,
+        maxPlayerSpeed = 200,
+        heroColor = new Phaser.Display.Color(255, 255, 255),
+        invincibleColor = new Phaser.Display.Color(56, 194, 239);
 
       var game = new Phaser.Game(config);
 
@@ -75,7 +81,9 @@
         this.load.image("shell", "shell.png");
         this.load.image("heart", "heart.png");
         this.load.image("heart-filled", "heart-filled.png");
-        this.load.image('spikes', 'spikes.png');
+        this.load.image("spikes", "spikes.png");
+        this.load.image("powerup", "powerup-16.jpg");
+        this.load.image("dust", "dust-small.jpg");
       }
 
       function create() {
@@ -86,10 +94,10 @@
         this.input.addPointer(1);
         platforms = this.physics.add.staticGroup();
 
-        platforms.create(565, 400, 'ground').setScale(2).refreshBody();
-        platforms.create(-125, 385, 'ground');
-        platforms.create(50, 240, 'ground');
-        platforms.create(750, 140, 'ground');
+        platforms.create(565, 400, "ground").setScale(2).refreshBody();
+        platforms.create(-125, 385, "ground");
+        platforms.create(50, 240, "ground");
+        platforms.create(750, 140, "ground");
 
         player = this.physics.add.sprite(50, 350, "hero");
         player.setCollideWorldBounds(true);
@@ -98,6 +106,7 @@
         player.body.maxVelocity.y = 500;
         player.invulnerable = false;
         player.hearts = maxHearts;
+        player.invincible = false;
 
         cursors = this.input.keyboard.createCursorKeys();
 
@@ -139,17 +148,27 @@
 
         spikes = this.physics.add.staticGroup();
         spikes.enableBody = true;
-        spikes = spikes.create(120, 385, 'spikes');
+        spikes = spikes.create(120, 385, "spikes");
         spikes.body.immovable = true;
 
         var heartOutline1 = this.add.sprite(760, 38, "heart"),
-        heartOutline2 = this.add.sprite(720, 38, "heart"),
-        heartOutline3 = this.add.sprite(680, 38, "heart");
+          heartOutline2 = this.add.sprite(720, 38, "heart"),
+          heartOutline3 = this.add.sprite(680, 38, "heart");
         heartOutlines = [heartOutline1, heartOutline2, heartOutline3];
         heart1 = this.add.sprite(760, 38, "heart-filled");
         heart2 = this.add.sprite(720, 38, "heart-filled");
         heart3 = this.add.sprite(680, 38, "heart-filled");
         hearts = [heart1, heart2, heart3];
+
+        invicibility = this.physics.add.sprite(220, 360, "powerup");
+        invicibility.setOrigin(0.5, 0.5);
+
+        var particles = this.add.particles("dust");
+        emitter = particles.createEmitter();
+        emitter.setPosition(player.x, player.y);
+        emitter.setSpeed(150);
+        emitter.setBlendMode(Phaser.BlendModes.ADD);
+        emitter.pause();
 
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(coins, platforms);
@@ -158,12 +177,75 @@
         this.physics.add.collider(player, shell, shellHit, null, this);
         this.physics.add.collider(player, spikes, playerHit, null, this);
         this.physics.add.collider(shell, spikes, destroyShell, null, this);
+        this.physics.add.collider(invicibility, platforms);
+        this.physics.add.overlap(
+          player,
+          invicibility,
+          goInvincibile,
+          null,
+          this
+        );
         this.physics.add.overlap(shell, baddie, shellHitBaddie, null, this);
         this.physics.add.overlap(player, coins, collectCoin, null, this);
         this.physics.add.overlap(player, baddie, hitBaddie, null, this);
         buildTouchSlider(this);
       }
+      function goInvincibile(player, invicibility) {
+        invicibility.disableBody(false, false);
 
+        player.body.maxVelocity.x = superPlayerSpeed;
+
+        emitter.resume();
+        this.tweens.addCounter({
+          from: 0,
+          to: 100,
+          duration: 500,
+          yoyo: true,
+          repeat: 5,
+          onUpdate: function (tween) {
+            emitter.setPosition(player.x, player.y);
+            var value = Math.floor(tween.getValue()),
+              newColorObject = Phaser.Display.Color.Interpolate.ColorWithColor(
+                heroColor,
+                invincibleColor,
+                100,
+                value
+              ),
+              color = Phaser.Display.Color.GetColor(
+                newColorObject.r,
+                newColorObject.g,
+                newColorObject.b
+              );
+            player.setTint(color);
+          },
+          onComplete: function () {
+            resetInvincibility();
+          },
+        });
+        var tween = this.tweens.add({
+          targets: invicibility,
+          alpha: 0.3,
+          angle: 90,
+          scaleX: 3,
+          scaleY: 3,
+          ease: "Linear",
+          duration: 500,
+          onComplete: function () {
+            destroyGameObject(invicibility);
+          },
+        });
+
+        player.invincible = true;
+      }
+
+      function resetInvincibility() {
+        player.invincible = false;
+
+        player.body.maxVelocity.x = maxPlayerSpeed;
+
+        emitter.pause();
+        emitter.killAll();
+      }
       function shellHit(player, shell) {
         var threshold = shell.x + shell.width / 2,
           playerX = player.x + player.width / 2;
@@ -252,10 +334,26 @@
           });
         } else {
           playerHit.call(this);
-        }}
-        function playerHit(){
-
-         if (!player.invulnerable) {
+        }
+      }
+      function playerHit() {
+        if (!player.invulnerable && !player.invincible) {
+          if (player.invincible) {
+            baddie.disableBody(false, false);
+            var tween = this.tweens.add({
+              targets: baddie,
+              alpha: 0.3,
+              y: "-=150",
+              scaleX: 2.5,
+              scaleY: 2.5,
+              angle: 180,
+              ease: "Linear",
+              duration: 200,
+              onComplete: function () {
+                destroyGameObject(baddie);
+              },
+            });
+          } else {
             player.invulnerable = true;
 
             var currentHeartCount = player.hearts,
@@ -331,22 +429,23 @@
             }
           }
         }
-        function destroyShell() {
-    shell.disableBody(false, false);
-    var destroyShell = this.tweens.add({
-        targets: shell,
-        alpha: 0.3,
-        scaleX: 2,
-        scaleY: 2,
-        y: "-=100",
-        rotation: -360,
-        ease: 'Linear',
-        duration: 200,
-        onComplete: function() {
+      }
+      function destroyShell() {
+        shell.disableBody(false, false);
+        var destroyShell = this.tweens.add({
+          targets: shell,
+          alpha: 0.3,
+          scaleX: 2,
+          scaleY: 2,
+          y: "-=100",
+          rotation: -360,
+          ease: "Linear",
+          duration: 200,
+          onComplete: function () {
             destroyGameObject(shell);
-        },
-    });
-}
+          },
+        });
+      }
       function playerVulnerable(game) {
         var death = game.tweens.add({
           targets: player,
