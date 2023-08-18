@@ -1,37 +1,36 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <title>Setup - Phaser Platformer series</title>
     <script src="js/phaser.min.js"></script>
-    <link rel="stylesheet" href="css/screen.css">
-</head>
+    <link rel="stylesheet" href="css/screen.css" />
+  </head>
 
-<body>
+  <body>
     <script type="text/javascript">
-    var config = {
+      var config = {
         type: Phaser.AUTO,
         width: 800,
         height: 400,
         transparent: true,
         physics: {
-            default: 'arcade',
-            arcade: {
-                gravity: { y: 300 }
-            }
+          default: "arcade",
+          arcade: {
+            gravity: { y: 300 },
+          },
         },
         scene: {
-            preload: preload,
-            create: create,
-            update: update
+          preload: preload,
+          create: create,
+          update: update,
         },
         input: {
-  activePointers: 3
-        }
-    };
+          activePointers: 3,
+        },
+      };
 
-    var player,
+      var player,
         coins,
         platforms,
         cursors,
@@ -46,29 +45,30 @@
         touchJump = false,
         touchJumpThreshold = 5,
         edgeTimer = 0;
-        
-    var game = new Phaser.Game(config);
 
-    function preload() {
+      var game = new Phaser.Game(config);
+
+      function preload() {
         this.load.setBaseURL("assets/");
-        this.load.image('ground', 'platform.jpg');
-        this.load.image('coin', 'coin.jpg');
-        this.load.image('hero', 'hero.jpg');
+         this.load.image("ground", "platform.jpg");
+        this.load.image("coin", "coin.jpg");
+        this.load.image("hero", "hero.jpg");
+        this.load.image("touch-slider", "assets/touch-slider.png");
+        this.load.image("touch-knob", "assets/touch-knob.png");
+      }
 
-    }
-
-    function create() {
-        var logo = this.add.sprite(config.width / 2, config.height / 2, 'logo');
+      function create() {
+        var logo = this.add.sprite(config.width / 2, config.height / 2, "logo");
         logo.alpha = 0.4;
         logo.setScale(0.5);
         this.input.addPointer(1);
         platforms = this.physics.add.staticGroup();
 
-        platforms.create(400, 400, 'ground').setScale(2).refreshBody();
-        platforms.create(50, 240, 'ground');
-        platforms.create(750, 140, 'ground');
+        platforms.create(400, 400, "ground").setScale(2).refreshBody();
+        platforms.create(50, 240, "ground");
+        platforms.create(750, 140, "ground");
 
-        player = this.physics.add.sprite(100, 350, 'hero');
+        player = this.physics.add.sprite(100, 350, "hero");
 
         player.setCollideWorldBounds(true);
         //setspeed
@@ -80,142 +80,173 @@
         cursors = this.input.keyboard.createCursorKeys();
 
         coins = this.physics.add.group({
-            key: 'coin',
-            repeat: 11,
-            setXY: { x: 12, y: 0, stepX: 70 }
+          key: "coin",
+          repeat: 11,
+          setXY: { x: 12, y: 0, stepX: 70 },
         });
 
-        coins.children.iterate(function(child) {
-            child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+        coins.children.iterate(function (child) {
+          child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
         });
 
-        scoreText = this.add.text(config.width - 140, 16, 'score: 0', { fontSize: '24px', fill: '#fff' });
+        scoreText = this.add.text(config.width - 140, 16, "score: 0", {
+          fontSize: "24px",
+          fill: "#fff",
+        });
 
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(coins, platforms);
         this.physics.add.overlap(player, coins, collectCoin, null, this);
-    }
+        buildTouchSlider(this);
+      }
+      function buildTouchSlider(game) {
+        sliderBar = game.add.sprite(0, 0, "touch-slider");
+        sliderKnob = game.add.sprite(0, 0, "touch-knob");
 
-    function update() {
+        touchSlider = game.add.container(100, 450);
+        touchSlider.add(sliderBar);
+        touchSlider.add(sliderKnob);
+        touchSlider.alpha = 0;
+      }
+
+      function update() {
         var standing = player.body.blocked.down || player.body.touching.down;
         var d = new Date();
         var time = d.getTime();
         //if left key is down then move left
         if (cursors.left.isDown) {
-            moveLeft();
+          moveLeft();
         }
         //same deal but for right arrow
         else if (cursors.right.isDown) {
-            moveRight();
+          moveRight();
         }
         //if neither left or right arrow is down then...
         else {
-            player.setAccelerationX(((player.body.velocity.x > 0) ? -1 : 1) * acceleration / 3);
-            if (Math.abs(player.body.velocity.x) < 10 && Math.abs(player.body.velocity.x) > -10) 
-{
-  player.setVelocityX(0);
-  player.setAccelerationX(0);
-}
+          player.setAccelerationX(
+            ((player.body.velocity.x > 0 ? -1 : 1) * acceleration) / 3
+          );
+          if (
+            Math.abs(player.body.velocity.x) < 10 &&
+            Math.abs(player.body.velocity.x) > -10
+          ) {
+            player.setVelocityX(0);
+            player.setAccelerationX(0);
+          }
         }
 
         //If player is touching floor and up key is pressed then jump
-        if (standing && cursors.up.isDown && (!jumping)) {
-            player.setVelocityY(jumpVelocity);
-            jumping = true;
+        if (standing && cursors.up.isDown && !jumping) {
+          player.setVelocityY(jumpVelocity);
+          jumping = true;
+        } else if (!cursors.up.isDown) {
+          if (player.body.touching.down) {
+            jumping = false;
+          }
         }
-        else if (!cursors.up.isDown) {
-      if (player.body.touching.down) {
-          jumping = false;
-      }
-  }
-  if (!standing && wasStanding) {
-    edgeTimer = time + 100;
-  }
-  if ((standing || time <= edgeTimer) && cursors.up.isDown && !jumping) {
-            player.setVelocityY(jumpVelocity);
-            jumping = true;
+        if (!standing && wasStanding) {
+          edgeTimer = time + 100;
         }
- if (this.input.pointer1.isDown || this.input.pointer2.isDown) {
-    var leftHalf = config.width / 2;
-    if (this.input.pointer1.x < leftHalf || this.input.pointer2.x < leftHalf) {
-        var myMovePointer = null;
-if (this.input.pointer1.x < leftHalf && this.input.pointer1.isDown) {
-  myMovePointer = this.input.pointer1;
-}
-if (this.input.pointer2.x < leftHalf && this.input.pointer2.isDown) {
-  myMovePointer = this.input.pointer2;
-}
-if (myMovePointer) {
-  if (Math.floor(myMovePointer.x / (leftHalf / 2)) === 0) {
-    moveLeft();
-  }
-  if (Math.floor(myMovePointer.x / (leftHalf / 2)) === 1) {
-    moveRight();
-  }
-}
-    }
-    if (this.input.pointer1.x > leftHalf || this.input.pointer2.x > leftHalf) {
-        var myJumpPointer = null;
-if (this.input.pointer1.x > leftHalf && this.input.pointer1.isDown) {
-  myJumpPointer = this.input.pointer1;
-}
-if (this.input.pointer2.x > leftHalf && this.input.pointer2.isDown) {
-  myJumpPointer = this.input.pointer2;
-}
-if (myJumpPointer) {
-  prevPos = yPos;
-  yPos = myJumpPointer.y;
-  if (prevPos - yPos > touchJumpThreshold) {
-  touchJump = true;
-}
-}
-
-    } 
-}
-if ((standing || time <= edgeTimer) && (cursors.up.isDown || touchJump) && !jumping) {
-            player.setVelocityY(jumpVelocity);
-            jumping = true;
+        if ((standing || time <= edgeTimer) && cursors.up.isDown && !jumping) {
+          player.setVelocityY(jumpVelocity);
+          jumping = true;
         }
-
+        if (this.input.pointer1.isDown || this.input.pointer2.isDown) {
+          var leftHalf = config.width / 2;
+          if (
+            this.input.pointer1.x < leftHalf ||
+            this.input.pointer2.x < leftHalf
+          ) {
+            var myMovePointer = null;
+            if (
+              this.input.pointer1.x < leftHalf &&
+              this.input.pointer1.isDown
+            ) {
+              myMovePointer = this.input.pointer1;
+            }
+            if (
+              this.input.pointer2.x < leftHalf &&
+              this.input.pointer2.isDown
+            ) {
+              myMovePointer = this.input.pointer2;
+            }
+            if (myMovePointer) {
+              if (Math.floor(myMovePointer.x / (leftHalf / 2)) === 0) {
+                moveLeft();
+              }
+              if (Math.floor(myMovePointer.x / (leftHalf / 2)) === 1) {
+                moveRight();
+              }
+            }
+          }
+          if (
+            this.input.pointer1.x > leftHalf ||
+            this.input.pointer2.x > leftHalf
+          ) {
+            var myJumpPointer = null;
+            if (
+              this.input.pointer1.x > leftHalf &&
+              this.input.pointer1.isDown
+            ) {
+              myJumpPointer = this.input.pointer1;
+            }
+            if (
+              this.input.pointer2.x > leftHalf &&
+              this.input.pointer2.isDown
+            ) {
+              myJumpPointer = this.input.pointer2;
+            }
+            if (myJumpPointer) {
+              prevPos = yPos;
+              yPos = myJumpPointer.y;
+              if (prevPos - yPos > touchJumpThreshold) {
+                touchJump = true;
+              }
+            }
+          }
+        }
+        if (
+          (standing || time <= edgeTimer) &&
+          (cursors.up.isDown || touchJump) &&
+          !jumping
+        ) {
+          player.setVelocityY(jumpVelocity);
+          jumping = true;
+        }
 
         if (!cursors.up.isDown) {
-         
-            if (player.body.touching.down) {
-                jumping = false;
-                touchJump = false;
-                prevPos = 0;
-            }
+          if (player.body.touching.down) {
+            jumping = false;
+            touchJump = false;
+            prevPos = 0;
+          }
         }
- 
-wasStanding = standing;
-    }
-    function moveLeft() {
-  var standing = player.body.blocked.down || player.body.touching.down;
 
-  if (standing) {
-    player.setAccelerationX(-acceleration);
-  }
-  else {
-    player.setAccelerationX(-acceleration / 3);
-  }
-}
+        wasStanding = standing;
+      }
+      function moveLeft() {
+        var standing = player.body.blocked.down || player.body.touching.down;
 
-function moveRight() {
-  var standing = player.body.blocked.down || player.body.touching.down;
-  if (standing) {
-    player.setAccelerationX(acceleration);
-  }
+        if (standing) {
+          player.setAccelerationX(-acceleration);
+        } else {
+          player.setAccelerationX(-acceleration / 3);
+        }
+      }
 
-  else {
-    player.setAccelerationX(acceleration / 3);
-  }
-}
-    function collectCoin(player, coin) {
+      function moveRight() {
+        var standing = player.body.blocked.down || player.body.touching.down;
+        if (standing) {
+          player.setAccelerationX(acceleration);
+        } else {
+          player.setAccelerationX(acceleration / 3);
+        }
+      }
+      function collectCoin(player, coin) {
         coin.disableBody(true, true);
         score += 10;
-        scoreText.setText('Score: ' + score);
-    }
+        scoreText.setText("Score: " + score);
+      }
     </script>
-</body>
-
+  </body>
 </html>
