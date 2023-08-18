@@ -36,7 +36,9 @@
         acceleration = 600,
         jumpVelocity = -330,
         jumping = false,
-        scoreText;
+        scoreText,
+        wasStanding = false,
+        edgeTimer = 0;
         
     var game = new Phaser.Game(config);
 
@@ -89,6 +91,8 @@
 
     function update() {
         var standing = player.body.blocked.down || player.body.touching.down;
+        var d = new Date();
+        var time = d.getTime();
         //if left key is down then move left
         if (cursors.left.isDown) {
             if (standing) {
@@ -129,6 +133,14 @@
           jumping = false;
       }
   }
+  if (!standing && wasStanding) {
+    edgeTimer = time + 100;
+  }
+  if ((standing || time <= edgeTimer) && cursors.up.isDown && !jumping) {
+            player.setVelocityY(jumpVelocity);
+            jumping = true;
+        }
+        wasStanding = standing;
     }
 
     function collectCoin(player, coin) {
