@@ -44,13 +44,21 @@
         yPos = 0,
         touchJump = false,
         touchJumpThreshold = 5,
-        edgeTimer = 0;
+        edgeTimer = 0,
+        touchSlider,
+        sliderBar,
+        sliderKnob,
+        touchMoving = false,
+        touchMoveThreshold = 3,
+        largeThumbMoveAcross = 25,
+        thumbSizeOffset = 60,
+        startX;
 
       var game = new Phaser.Game(config);
 
       function preload() {
         this.load.setBaseURL("assets/");
-         this.load.image("ground", "platform.jpg");
+        this.load.image("ground", "platform.jpg");
         this.load.image("coin", "coin.jpg");
         this.load.image("hero", "hero.jpg");
         this.load.image("touch-slider", "assets/touch-slider.png");
@@ -171,6 +179,29 @@
               myMovePointer = this.input.pointer2;
             }
             if (myMovePointer) {
+              if (!touchSlider.alpha) {
+                touchSlider.alpha = 1;
+                touchSlider.x = myMovePointer.x;
+                touchSlider.y = myMovePointer.y - thumbSizeOffset;
+                startX = myMovePointer.x;
+                sliderKnob.x = 0;
+              }
+              if (myMovePointer.x < startX || myMovePointer.x > startX) {
+    var movement = 0;
+    if (myMovePointer.x < startX) movement = startX - myMovePointer.x; 
+
+    if (myMovePointer.x > startX) movement = myMovePointer.x - startX;
+  
+    if (movement > touchMoveThreshold) {
+        touchMoving = true;
+    }
+  
+    else {
+        touchMoving = false;
+        
+    }
+}
+            }
               if (Math.floor(myMovePointer.x / (leftHalf / 2)) === 0) {
                 moveLeft();
               }
