@@ -126,9 +126,26 @@
         scoreCoin.scaleY = 0.5;
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(coins, platforms);
+        this.physics.add.collider(player, ladders, null, checkLadderTop, this);
         this.physics.add.overlap(player, coins, collectCoin, null, this);
         this.physics.add.overlap(player, baddie, hitBaddie, null, this);
         buildTouchSlider(this);
+      }
+      function checkLadderTop(player, ladder) {
+        /* We check here if our player is higher up than the ladder i.e. if the player is on top of the ladder
+    the sprites are positioned from their centres, so we have to add or subtract half their height to find the heroes feet and the top of the ladder. 
+    With the player we add half the height so we are checking the positon of their feet. With the ladder we add half the height so we are checking the top of the ladder. We also round the two values differently, floor for the player to give us the smallest number possible and ceil for the ladder height to give us the highest number possible. This deals with any subpixel values.
+    */
+        if (
+          Math.floor(player.y + player.height / 2) <=
+          Math.ceil(ladder.y - ladder.height / 2)
+        ) {
+          if (cursors.down.isDown || Math.floor(prevPos) < Math.floor(yPos))
+            return false;
+          else return true;
+        } else {
+          return false;
+        }
       }
       function isOnLadder() {
         onLadder = true;
@@ -328,7 +345,12 @@
 
               yPos = myJumpPointer.y;
               if (onLadder) {
-                player.setVelocityY(0);
+                if (
+                  Math.floor(player.y + player.height / 2) <=
+                  Math.ceil(ladder.y - ladder.height / 2)
+                ) {
+                  player.setVelocityY(0);
+                }
                 if (Math.floor(prevPos) > Math.floor(yPos)) {
                   if (!myMovePointer) {
                     player.x = ladder.x;
@@ -358,7 +380,7 @@
             player.setVelocityY(0);
           }
         }
-       
+
         if (!cursors.right.isDown && !cursors.left.isDown && !touchMoving) {
           if (
             Math.abs(player.body.velocity.x) < 10 &&
@@ -376,28 +398,28 @@
         var d = new Date();
         var time = d.getTime();
         if (onLadder && !isTouch) {
-    //kill any upwards / downwards velocity from our hero
-    player.setVelocityY(0);
+          player.setVelocityY(0);
 
-    if (cursors.up.isDown) {
-        if (!cursors.left.isDown && !cursors.right.isDown) {
-            //when moving vertically we want the player pefectly lined up
+          if (cursors.up.isDown) {
+            if (!cursors.left.isDown && !cursors.right.isDown) {
+              player.x = ladder.x;
+
+              player.setVelocityX(0);
+              player.setVelocityY(-100);
+            }
+          }
+
+          if (
+            cursors.down.isDown &&
+            !cursors.left.isDown &&
+            !cursors.right.isDown
+          ) {
             player.x = ladder.x;
-            //also kill any x velocity to be sure
+
             player.setVelocityX(0);
-            player.setVelocityY(-100);
+            player.setVelocityY(100);
+          }
         }
-    }
-    //if JUST down is being pressed then line up player perfectly with ladder. 
-    //We do this to make it quicker - but like a firemans pole
-    if (cursors.down.isDown && !cursors.left.isDown && !cursors.right.isDown) {
-        //when moving vertically we want the player pefectly lined up
-        player.x = ladder.x;
-        //also kill any x velocity to be sure
-        player.setVelocityX(0);
-        player.setVelocityY(100);
-    }
-}
         if (!standing && wasStanding) {
           edgeTimer = time + 100;
         }
