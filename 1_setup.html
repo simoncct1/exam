@@ -104,6 +104,9 @@
         baddie = this.physics.add.sprite(620, 350, "baddie");
         baddie.setOrigin(0.5, 0.5);
         baddie.setCollideWorldBounds(true);
+        baddie.body.velocity.x = -100;
+        baddie.maxDistance = 300;
+        baddie.previousX = baddie.x;
         this.physics.add.collider(baddie, platforms);
         scoreCoin = this.add.sprite(30, 32, "coin");
         scoreCoin.setOrigin(0.5, 0.5);
@@ -184,10 +187,17 @@
           player.setAccelerationX(acceleration / 3);
         }
       }
+      function switchDirection(baddie) {
+        baddie.body.velocity.x *= -1;
+
+        baddie.previousX = baddie.x;
+      }
 
       function update() {
         var standing = player.body.blocked.down || player.body.touching.down;
-
+        if (Math.abs(baddie.x - baddie.previousX) >= baddie.maxDistance) {
+          switchDirection(baddie);
+        }
         if (cursors.left.isDown) {
           moveLeft(acceleration);
         } else if (cursors.right.isDown) {
