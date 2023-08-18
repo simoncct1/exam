@@ -35,8 +35,9 @@
         score = 0,
         acceleration = 600,
         jumpVelocity = -330,
+        jumping = false,
         scoreText;
-
+        
     var game = new Phaser.Game(config);
 
     function preload() {
@@ -119,9 +120,15 @@
         }
 
         //If player is touching floor and up key is pressed then jump
-        if (standing && cursors.up.isDown) {
-            player.setVelocityY(-330);
+        if (standing && cursors.up.isDown && (!jumping)) {
+            player.setVelocityY(jumpVelocity);
+            jumping = true;
         }
+        else if (!cursors.up.isDown) {
+      if (player.body.touching.down) {
+          jumping = false;
+      }
+  }
     }
 
     function collectCoin(player, coin) {
