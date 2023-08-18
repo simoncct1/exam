@@ -35,7 +35,6 @@
         score = 0,
         scoreText,
         acceleration = 600,
-        jumpVelocity = -330,
         wasStanding = false,
         edgeTimer = 0,
         jumping = false,
@@ -68,7 +67,11 @@
         coinTweens = [],
         baddies,
         camera,
-        hud;
+        hud,
+        mushroom,
+        jumpVelocity = -165,
+        jumpVelocitySmall = -165,
+        jumpVelocityBig = -330;
 
       var game = new Phaser.Game(config);
 
@@ -88,6 +91,7 @@
         this.load.image("spikes", "spikes.png");
         this.load.image("powerup", "powerup-16.jpg");
         this.load.image("dust", "dust-small.jpg");
+        this.load.image("hero-small", "hero-16.jpg");
       }
 
       function create() {
@@ -106,7 +110,7 @@
         platforms.create(150, 240, "ground");
         platforms.create(860, 190, "ground");
 
-        player = this.physics.add.sprite(50, 350, "hero");
+        player = this.physics.add.sprite(40, 350, "hero-small");
         player.setCollideWorldBounds(true);
         player.setBounce(0);
         player.body.maxVelocity.x = 200;
@@ -173,7 +177,7 @@
         heart3 = this.add.sprite(680, 38, "heart-filled");
         hearts = [heart1, heart2, heart3];
 
-        invicibility = this.physics.add.sprite(220, 360, "powerup");
+        invicibility = this.physics.add.sprite(220, 60, "powerup");
         invicibility.setOrigin(0.5, 0.5);
 
         var particles = this.add.particles("dust");
@@ -199,6 +203,10 @@
         ]);
         hud.setScrollFactor(0);
 
+        mushroom = this.physics.add.sprite(120, 360, "powerup");
+        mushroom.setOrigin(0.5, 0.5);
+        mushroom.setTintFill(0xff9800);
+
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(coins, platforms);
         this.physics.add.collider(baddies, platforms);
@@ -209,11 +217,74 @@
         this.physics.add.collider(shell, platforms, shellWallHit, null, this);
         this.physics.add.collider(shell, spikes, destroyShell, null, this);
         this.physics.add.collider(invicibility, platforms);
-        this.physics.add.overlap(player,invicibility,goInvincibile,null, this);
+        this.physics.add.collider(mushroom, platforms);
+        this.physics.add.overlap(player, mushroom, collectMushroom, null, this);
+        this.physics.add.overlap(
+          player,
+          invicibility,
+          goInvincibile,
+          null,
+          this
+        );
         this.physics.add.overlap(shell, baddies, shellHitBaddie, null, this);
         this.physics.add.overlap(player, coins, collectCoin, null, this);
         this.physics.add.overlap(player, baddies, hitBaddie, null, this);
         buildTouchSlider(this);
+      }
+
+      function shrinkHero() {
+        player.setTexture("hero-small");
+
+        player.setSize(22, 22);
+
+        player.isBig = false;
+
+        player.isChangingSize = false;
+      }
+
+      function growHero() {
+        player.setTexture("hero");
+
+        player.setSize(32, 32);
+
+        player.isBig = true;
+
+        player.isChangingSize = false;
+      }
+
+      function collectMushroom(player, mushroom) {
+        player.body.velocity.x = 0;
+        player.body.velocity.y = 0;
+
+        player.isChangingSize = true;
+
+        mushroom.disableBody(false, false);
+
+        var tween = this.tweens.add({
+          targets: player,
+          scaleX: 1.5,
+          scaleY: 1.5,
+          yoyo: 1,
+          repeat: 1,
+          ease: "Linear",
+          duration: 100,
+          onComplete: function () {
+            growHero();
+          },
+        });
+
+        var tween = this.tweens.add({
+          targets: mushroom,
+          alpha: 0.3,
+          angle: 90,
+          scaleX: 0.3,
+          scaleY: 0.3,
+          ease: "Linear",
+          duration: 500,
+          onComplete: function () {
+            destroyGameObject(mushroom);
+          },
+        });
       }
 
       function shellWallHit(shell, wall) {
@@ -348,7 +419,7 @@
       }
 
       function hitBaddie(player, baddie) {
-        if (baddie.body.touching.up && !baddie.hit) {
+        if (baddie.body.touching.up && !baddie.hit && !player.isChangingSize) {
           baddie.disableBody(false, false);
           player.setVelocityY(jumpVelocity);
 
@@ -368,95 +439,115 @@
         }
       }
       function playerHit() {
-        if (!player.invulnerable && !player.invincible) {
-          if (player.invincible) {
-            baddie.disableBody(false, false);
-            var tween = this.tweens.add({
-              targets: baddie,
-              alpha: 0.3,
-              y: "-=150",
-              scaleX: 2.5,
-              scaleY: 2.5,
-              angle: 180,
-              ease: "Linear",
-              duration: 200,
-              onComplete: function () {
-                destroyGameObject(baddie);
-              },
-            });
-          } else {
-            player.invulnerable = true;
+        if (player.isBig) {
+          player.body.velocity.x = 0;
+          player.body.velocity.y = -220;
+          player.isChangingSize = true;
 
-            var currentHeartCount = player.hearts,
-              currentHeart = hearts[currentHeartCount - 1],
-              currentHeartOutline = heartOutlines[currentHeartCount - 1];
-
-            var heartFade = this.tweens.add({
-              targets: currentHeart,
-              alpha: 0,
-              scaleX: 0,
-              scaleY: 0,
-              ease: "Linear",
-              duration: 200,
-            });
-
-            var heartsTimeline = this.tweens.createTimeline();
-
-            heartsTimeline.add({
-              targets: currentHeartOutline,
-              scaleX: 0.5,
-              scaleY: 0.5,
-              ease: "Power1",
-              duration: 200,
-            });
-
-            heartsTimeline.add({
-              targets: currentHeartOutline,
-              scaleX: 1,
-              scaleY: 1,
-              ease: "Power1",
-              duration: 200,
-            });
-
-            heartsTimeline.play();
-
-            player.hearts -= 1;
-
-            if (player.hearts <= 0) {
-              player.disableBody(false, false);
-
+          var tween = this.tweens.add({
+            targets: player,
+            scaleX: 0.8,
+            scaleY: 0.8,
+            alpha: 0.3,
+            yoyo: 2,
+            repeat: 2,
+            ease: "Linear",
+            duration: 100,
+            onComplete: function () {
+              shrinkHero();
+            },
+          });
+        } else {
+          if (!player.invulnerable && !player.invincible) {
+            if (player.invincible) {
+              baddie.disableBody(false, false);
               var tween = this.tweens.add({
-                targets: player,
+                targets: baddie,
                 alpha: 0.3,
-                scaleX: 1.1,
-                scaleY: 1.1,
-                angle: 90,
-                x: player.x - 20,
-                y: player.y - 20,
+                y: "-=150",
+                scaleX: 2.5,
+                scaleY: 2.5,
+                angle: 180,
                 ease: "Linear",
                 duration: 200,
                 onComplete: function () {
-                  restartGame(this);
+                  destroyGameObject(baddie);
                 },
-                onCompleteScope: this,
               });
             } else {
-              player.body.velocity.x = 0;
-              player.body.velocity.y = -220;
+              player.invulnerable = true;
 
-              var tween = this.tweens.add({
-                targets: player,
-                alpha: 0.3,
+              var currentHeartCount = player.hearts,
+                currentHeart = hearts[currentHeartCount - 1],
+                currentHeartOutline = heartOutlines[currentHeartCount - 1];
+
+              var heartFade = this.tweens.add({
+                targets: currentHeart,
+                alpha: 0,
+                scaleX: 0,
+                scaleY: 0,
                 ease: "Linear",
                 duration: 200,
-                onCompleteScope: this,
               });
 
-              var timer = this.time.delayedCall(
-                vulnerableTime,
-                playerVulnerable,
-                [this]
-              );
+              var heartsTimeline = this.tweens.createTimeline();
+
+              heartsTimeline.add({
+                targets: currentHeartOutline,
+                scaleX: 0.5,
+                scaleY: 0.5,
+                ease: "Power1",
+                duration: 200,
+              });
+
+              heartsTimeline.add({
+                targets: currentHeartOutline,
+                scaleX: 1,
+                scaleY: 1,
+                ease: "Power1",
+                duration: 200,
+              });
+
+              heartsTimeline.play();
+
+              player.hearts -= 1;
+
+              if (player.hearts <= 0) {
+                player.disableBody(false, false);
+
+                var tween = this.tweens.add({
+                  targets: player,
+                  alpha: 0.3,
+                  scaleX: 1.1,
+                  scaleY: 1.1,
+                  angle: 90,
+                  x: player.x - 20,
+                  y: player.y - 20,
+                  ease: "Linear",
+                  duration: 200,
+                  onComplete: function () {
+                    restartGame(this);
+                  },
+                  onCompleteScope: this,
+                });
+              } else {
+                player.body.velocity.x = 0;
+                player.body.velocity.y = -220;
+
+                var tween = this.tweens.add({
+                  targets: player,
+                  alpha: 0.3,
+                  ease: "Linear",
+                  duration: 200,
+                  onCompleteScope: this,
+                });
+
+                var timer = this.time.delayedCall(
+                  vulnerableTime,
+                  playerVulnerable,
+                  [this]
+                );
+              }
             }
           }
         }
@@ -530,16 +621,19 @@
 
       function update() {
         var standing = player.body.blocked.down || player.body.touching.down;
-
+        if (player.isBig) jumpVelocity = jumpVelocityBig;
+        else jumpVelocity = jumpVelocitySmall;
         for (var i = 0; i < coinTweens.length; i++) {
           var tween = coinTweens[i];
           if (tween) tween.updateTo("x", camera.scrollX + scoreCoin.x);
         }
-        baddies.getChildren().forEach(function(theBaddie) {
-    if (Math.abs(theBaddie.x - theBaddie.previousX) >= theBaddie.maxDistance) {
-        switchDirection(theBaddie);
-    }
-}, this);
+        baddies.getChildren().forEach(function (theBaddie) {
+          if (
+            Math.abs(theBaddie.x - theBaddie.previousX) >= theBaddie.maxDistance
+          ) {
+            switchDirection(theBaddie);
+          }
+        }, this);
         if (cursors.left.isDown) {
           moveLeft(acceleration);
         } else if (cursors.right.isDown) {
