@@ -71,7 +71,8 @@
         mushroom,
         jumpVelocity = -165,
         jumpVelocitySmall = -165,
-        jumpVelocityBig = -330;
+        jumpVelocityBig = -330,
+        questionMarkBlock;
 
       var game = new Phaser.Game(config);
 
@@ -92,6 +93,8 @@
         this.load.image("powerup", "powerup-16.jpg");
         this.load.image("dust", "dust-small.jpg");
         this.load.image("hero-small", "hero-16.jpg");
+        this.load.image("question-mark-block", "question-mark-block.jpg");
+        this.load.image("empty-box", "empty-box.jpg");
       }
 
       function create() {
@@ -203,9 +206,21 @@
         ]);
         hud.setScrollFactor(0);
 
-        mushroom = this.physics.add.sprite(120, 360, "powerup");
+        mushroom = this.physics.add.sprite(520, 310, "powerup");
         mushroom.setOrigin(0.5, 0.5);
         mushroom.setTintFill(0xff9800);
+        mushroom.enableBody = false;
+        mushroom.visible = false;
+        mushroom.body.setAllowGravity(false);
+
+        questionMarkBlock = this.physics.add.sprite(
+          520,
+          310,
+          "question-mark-block"
+        );
+        questionMarkBlock.body.setAllowGravity(false);
+        questionMarkBlock.setImmovable(true);
+        questionMarkBlock.powerup = mushroom;
 
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(coins, platforms);
@@ -218,6 +233,13 @@
         this.physics.add.collider(shell, spikes, destroyShell, null, this);
         this.physics.add.collider(invicibility, platforms);
         this.physics.add.collider(mushroom, platforms);
+        this.physics.add.collider(
+          player,
+          questionMarkBlock,
+          hitQuestionMarkBlock,
+          null,
+          this
+        );
         this.physics.add.overlap(player, mushroom, collectMushroom, null, this);
         this.physics.add.overlap(
           player,
@@ -230,6 +252,43 @@
         this.physics.add.overlap(player, coins, collectCoin, null, this);
         this.physics.add.overlap(player, baddies, hitBaddie, null, this);
         buildTouchSlider(this);
+      }
+
+      function emptyQuestionBlock(block) {
+        block.setTexture("empty-box");
+
+        block.powerup.enableBody = true;
+
+        block.powerup.body.setAllowGravity(true);
+
+        if (Math.floor(Math.random() * 1)) block.powerup.setVelocityX(-80);
+        else block.powerup.setVelocityX(80);
+      }
+
+      function hitQuestionMarkBlock(player, block) {
+        if (block.body.touching.down && !block.hit) {
+          block.hit = true;
+
+          block.powerup.visible = true;
+
+          var tween = this.tweens.add({
+            targets: block.powerup,
+            y: "-=24",
+            ease: "Linear",
+            duration: 300,
+            onComplete: function () {
+              emptyQuestionBlock(block);
+            },
+          });
+
+          var tween = this.tweens.add({
+            targets: block,
+            y: "-=5",
+            ease: "Linear",
+            yoyo: true,
+            duration: 100,
+          });
+        }
       }
 
       function shrinkHero() {
