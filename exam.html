@@ -64,7 +64,11 @@
         vulnerableTime = 1000,
         maxPlayerSpeed = 200,
         heroColor = new Phaser.Display.Color(255, 255, 255),
-        invincibleColor = new Phaser.Display.Color(56, 194, 239);
+        invincibleColor = new Phaser.Display.Color(56, 194, 239),
+        coinTweens = [],
+        baddies,
+        camera,
+        hud;
 
       var game = new Phaser.Game(config);
 
@@ -87,17 +91,20 @@
       }
 
       function create() {
+        this.physics.world.setBounds(0, 0, 1630, 400);
+
         var logo = this.add.sprite(config.width / 2, config.height / 2, "logo");
         logo.alpha = 0.4;
         logo.setScale(0.5);
+        logo.setScrollFactor(0.2);
 
         this.input.addPointer(1);
         platforms = this.physics.add.staticGroup();
 
-        platforms.create(565, 400, "ground").setScale(2).refreshBody();
-        platforms.create(-125, 385, "ground");
-        platforms.create(50, 240, "ground");
-        platforms.create(750, 140, "ground");
+        platforms.create(1300, 400, "ground").setScale(2).refreshBody();
+        platforms.create(400, 400, "ground").setScale(2).refreshBody();
+        platforms.create(150, 240, "ground");
+        platforms.create(860, 190, "ground");
 
         player = this.physics.add.sprite(50, 350, "hero");
         player.setCollideWorldBounds(true);
@@ -127,13 +134,19 @@
           fill: "#fff",
         });
 
-        baddie = this.physics.add.sprite(620, 350, "baddie");
+        baddies = this.physics.add.group();
+        baddie = baddies.create(1220, 350, "baddie");
         baddie.setOrigin(0.5, 0.5);
         baddie.setCollideWorldBounds(true);
         baddie.body.velocity.x = -100;
         baddie.maxDistance = 300;
         baddie.previousX = baddie.x;
-        this.physics.add.collider(baddie, platforms);
+        baddie = baddies.create(940, 100, "baddie");
+        baddie.setOrigin(0.5, 0.5);
+        baddie.setCollideWorldBounds(true);
+        baddie.body.velocity.x = -100;
+        baddie.maxDistance = 250;
+        baddie.previousX = baddie.x;
 
         ladders = this.physics.add.staticGroup();
         ladders.enableBody = true;
@@ -148,7 +161,7 @@
 
         spikes = this.physics.add.staticGroup();
         spikes.enableBody = true;
-        spikes = spikes.create(120, 385, "spikes");
+        spikes = spikes.create(850, 385, "spikes");
         spikes.body.immovable = true;
 
         var heartOutline1 = this.add.sprite(760, 38, "heart"),
@@ -170,25 +183,43 @@
         emitter.setBlendMode(Phaser.BlendModes.ADD);
         emitter.pause();
 
+        camera = this.cameras.main;
+        camera.setBounds(0, 0, 1630, 400);
+        camera.startFollow(player, true, 0.05, 0, -200, 120);
+
+        hud = this.add.container(0, 0, [
+          scoreCoin,
+          scoreText,
+          heart1,
+          heart2,
+          heart3,
+          heartOutline1,
+          heartOutline2,
+          heartOutline3,
+        ]);
+        hud.setScrollFactor(0);
+
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(coins, platforms);
+        this.physics.add.collider(baddies, platforms);
         this.physics.add.collider(player, ladders, null, checkLadderTop, this);
         this.physics.add.collider(shell, platforms);
         this.physics.add.collider(player, shell, shellHit, null, this);
         this.physics.add.collider(player, spikes, playerHit, null, this);
+        this.physics.add.collider(shell, platforms, shellWallHit, null, this);
         this.physics.add.collider(shell, spikes, destroyShell, null, this);
         this.physics.add.collider(invicibility, platforms);
-        this.physics.add.overlap(
-          player,
-          invicibility,
-          goInvincibile,
-          null,
-          this
-        );
-        this.physics.add.overlap(shell, baddie, shellHitBaddie, null, this);
+        this.physics.add.overlap(player,invicibility,goInvincibile,null, this);
+        this.physics.add.overlap(shell, baddies, shellHitBaddie, null, this);
         this.physics.add.overlap(player, coins, collectCoin, null, this);
-        this.physics.add.overlap(player, baddie, hitBaddie, null, this);
+        this.physics.add.overlap(player, baddies, hitBaddie, null, this);
         buildTouchSlider(this);
+      }
+
+      function shellWallHit(shell, wall) {
+        if (shell.body.onWall()) {
+          destroyShell.call(this);
+        }
       }
       function goInvincibile(player, invicibility) {
         invicibility.disableBody(false, false);
@@ -469,6 +500,7 @@
         touchSlider.add(sliderBar);
         touchSlider.add(sliderKnob);
         touchSlider.alpha = 0;
+        touchSlider.setScrollFactor(0);
       }
 
       function moveLeft(acceleration) {
@@ -498,9 +530,16 @@
 
       function update() {
         var standing = player.body.blocked.down || player.body.touching.down;
-        if (Math.abs(baddie.x - baddie.previousX) >= baddie.maxDistance) {
-          switchDirection(baddie);
+
+        for (var i = 0; i < coinTweens.length; i++) {
+          var tween = coinTweens[i];
+          if (tween) tween.updateTo("x", camera.scrollX + scoreCoin.x);
         }
+        baddies.getChildren().forEach(function(theBaddie) {
+    if (Math.abs(theBaddie.x - theBaddie.previousX) >= theBaddie.maxDistance) {
+        switchDirection(theBaddie);
+    }
+}, this);
         if (cursors.left.isDown) {
           moveLeft(acceleration);
         } else if (cursors.right.isDown) {
@@ -719,7 +758,7 @@
 
         score += 10;
         scoreText.setText("Score: " + score);
-        var tween = this.tweens.add({
+        var collectCoinTween = this.tweens.add({
           targets: coin,
           alpha: 0.3,
           angle: 720,
@@ -733,6 +772,8 @@
             destroyGameObject(coin);
           },
         });
+        coinTweens.push(collectCoinTween);
+
         var scoreCoinTimeline = this.tweens.timeline({
           targets: scoreCoin,
           duration: 100,
