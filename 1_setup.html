@@ -17,6 +17,7 @@
         physics: {
           default: "arcade",
           arcade: {
+            fps: 120,
             gravity: { y: 300 },
           },
         },
@@ -49,7 +50,9 @@
         touchMoveThreshold = 3,
         largeThumbMoveAcross = 25,
         thumbSizeOffset = 60,
-        startX;
+        startX,
+        onLadder = false,
+        ladders;
 
       var game = new Phaser.Game(config);
 
@@ -62,6 +65,7 @@
         this.load.image("touch-slider", "touch-slider.png");
         this.load.image("touch-knob", "touch-knob.png");
         this.load.image("baddie", "baddie.jpg");
+        this.load.image("ladder", "ladder.png");
       }
 
       function create() {
@@ -101,6 +105,7 @@
           fontSize: "32px",
           fill: "#fff",
         });
+
         baddie = this.physics.add.sprite(620, 350, "baddie");
         baddie.setOrigin(0.5, 0.5);
         baddie.setCollideWorldBounds(true);
@@ -108,6 +113,13 @@
         baddie.maxDistance = 300;
         baddie.previousX = baddie.x;
         this.physics.add.collider(baddie, platforms);
+
+        ladders = this.physics.add.staticGroup();
+        ladders.enableBody = true;
+        ladder = ladders.create(268, 296, "ladder");
+        ladder.body.immovable = true;
+        this.physics.add.overlap(player, ladders, isOnLadder, null, this);
+
         scoreCoin = this.add.sprite(30, 32, "coin");
         scoreCoin.setOrigin(0.5, 0.5);
         scoreCoin.scaleX = 0.5;
@@ -118,6 +130,11 @@
         this.physics.add.overlap(player, baddie, hitBaddie, null, this);
         buildTouchSlider(this);
       }
+      function isOnLadder() {
+        onLadder = true;
+        player.body.setAllowGravity(false);
+      }
+
       function hitBaddie(player, baddie) {
         if (baddie.body.touching.up) {
           baddie.disableBody(false, false);
@@ -246,7 +263,7 @@
 
                 if (movement > touchMoveThreshold) {
                   touchMoving = true;
-
+                  var isTouch = true;
                   var sliderPos = 0;
 
                   if (myMovePointer.x < startX)
@@ -310,9 +327,26 @@
               prevPos = yPos;
 
               yPos = myJumpPointer.y;
-
-              if (prevPos - yPos > touchJumpThreshold) {
-                touchJump = true;
+              if (onLadder) {
+                player.setVelocityY(0);
+                if (Math.floor(prevPos) > Math.floor(yPos)) {
+                  if (!myMovePointer) {
+                    player.x = ladder.x;
+                    player.setVelocityX(0);
+                    player.setVelocityY(-100);
+                  }
+                }
+                if (Math.floor(prevPos) < Math.floor(yPos)) {
+                  if (!myMovePointer) {
+                    player.x = ladder.x;
+                    player.setVelocityX(0);
+                    player.setVelocityY(100);
+                  }
+                }
+              } else {
+                if (prevPos - yPos > touchJumpThreshold) {
+                  touchJump = true;
+                }
               }
             }
           }
@@ -320,8 +354,11 @@
           touchSlider.alpha = 0;
           startX = 0;
           touchMoving = false;
+          if (onLadder) {
+            player.setVelocityY(0);
+          }
         }
-
+       
         if (!cursors.right.isDown && !cursors.left.isDown && !touchMoving) {
           if (
             Math.abs(player.body.velocity.x) < 10 &&
@@ -338,7 +375,29 @@
 
         var d = new Date();
         var time = d.getTime();
+        if (onLadder && !isTouch) {
+    //kill any upwards / downwards velocity from our hero
+    player.setVelocityY(0);
 
+    if (cursors.up.isDown) {
+        if (!cursors.left.isDown && !cursors.right.isDown) {
+            //when moving vertically we want the player pefectly lined up
+            player.x = ladder.x;
+            //also kill any x velocity to be sure
+            player.setVelocityX(0);
+            player.setVelocityY(-100);
+        }
+    }
+    //if JUST down is being pressed then line up player perfectly with ladder. 
+    //We do this to make it quicker - but like a firemans pole
+    if (cursors.down.isDown && !cursors.left.isDown && !cursors.right.isDown) {
+        //when moving vertically we want the player pefectly lined up
+        player.x = ladder.x;
+        //also kill any x velocity to be sure
+        player.setVelocityX(0);
+        player.setVelocityY(100);
+    }
+}
         if (!standing && wasStanding) {
           edgeTimer = time + 100;
         }
@@ -360,6 +419,8 @@
           }
         }
         wasStanding = standing;
+        if (!onLadder) player.body.setAllowGravity(true);
+        onLadder = false;
       }
 
       function collectCoin(player, coin) {
