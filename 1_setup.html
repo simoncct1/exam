@@ -25,6 +25,9 @@
             preload: preload,
             create: create,
             update: update
+        },
+        input: {
+  activePointers: 3
         }
     };
 
@@ -38,6 +41,10 @@
         jumping = false,
         scoreText,
         wasStanding = false,
+        prevPos = 0,
+        yPos = 0,
+        touchJump = false,
+        touchJumpThreshold = 5,
         edgeTimer = 0;
         
     var game = new Phaser.Game(config);
@@ -54,7 +61,7 @@
         var logo = this.add.sprite(config.width / 2, config.height / 2, 'logo');
         logo.alpha = 0.4;
         logo.setScale(0.5);
-
+        this.input.addPointer(1);
         platforms = this.physics.add.staticGroup();
 
         platforms.create(400, 400, 'ground').setScale(2).refreshBody();
@@ -95,23 +102,11 @@
         var time = d.getTime();
         //if left key is down then move left
         if (cursors.left.isDown) {
-            if (standing) {
-        player.setAccelerationX(-acceleration);
-    }
-    //if hero is in the air then accelerate slower
-    else {
-        player.setAccelerationX(-acceleration / 3);
-    }
+            moveLeft();
         }
         //same deal but for right arrow
         else if (cursors.right.isDown) {
-            if (standing) {
-        player.setAccelerationX(acceleration);
-    }
-    //if hero is in the air then accelerate slower
-    else {
-        player.setAccelerationX(acceleration / 3);
-    }
+            moveRight();
         }
         //if neither left or right arrow is down then...
         else {
@@ -140,9 +135,81 @@
             player.setVelocityY(jumpVelocity);
             jumping = true;
         }
-        wasStanding = standing;
+ if (this.input.pointer1.isDown || this.input.pointer2.isDown) {
+    var leftHalf = config.width / 2;
+    if (this.input.pointer1.x < leftHalf || this.input.pointer2.x < leftHalf) {
+        var myMovePointer = null;
+if (this.input.pointer1.x < leftHalf && this.input.pointer1.isDown) {
+  myMovePointer = this.input.pointer1;
+}
+if (this.input.pointer2.x < leftHalf && this.input.pointer2.isDown) {
+  myMovePointer = this.input.pointer2;
+}
+if (myMovePointer) {
+  if (Math.floor(myMovePointer.x / (leftHalf / 2)) === 0) {
+    moveLeft();
+  }
+  if (Math.floor(myMovePointer.x / (leftHalf / 2)) === 1) {
+    moveRight();
+  }
+}
     }
+    if (this.input.pointer1.x > leftHalf || this.input.pointer2.x > leftHalf) {
+        var myJumpPointer = null;
+if (this.input.pointer1.x > leftHalf && this.input.pointer1.isDown) {
+  myJumpPointer = this.input.pointer1;
+}
+if (this.input.pointer2.x > leftHalf && this.input.pointer2.isDown) {
+  myJumpPointer = this.input.pointer2;
+}
+if (myJumpPointer) {
+  prevPos = yPos;
+  yPos = myJumpPointer.y;
+  if (prevPos - yPos > touchJumpThreshold) {
+  touchJump = true;
+}
+}
 
+    } 
+}
+if ((standing || time <= edgeTimer) && (cursors.up.isDown || touchJump) && !jumping) {
+            player.setVelocityY(jumpVelocity);
+            jumping = true;
+        }
+
+
+        if (!cursors.up.isDown) {
+         
+            if (player.body.touching.down) {
+                jumping = false;
+                touchJump = false;
+                prevPos = 0;
+            }
+        }
+ 
+wasStanding = standing;
+    }
+    function moveLeft() {
+  var standing = player.body.blocked.down || player.body.touching.down;
+
+  if (standing) {
+    player.setAccelerationX(-acceleration);
+  }
+  else {
+    player.setAccelerationX(-acceleration / 3);
+  }
+}
+
+function moveRight() {
+  var standing = player.body.blocked.down || player.body.touching.down;
+  if (standing) {
+    player.setAccelerationX(acceleration);
+  }
+
+  else {
+    player.setAccelerationX(acceleration / 3);
+  }
+}
     function collectCoin(player, coin) {
         coin.disableBody(true, true);
         score += 10;
