@@ -5,8 +5,13 @@
     },
     "activeFile": "",
     "expandedProjectPaths": [
+        "."
     ],
     "fileStates": {
+        "environment-tiles.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        }
     },
     "last.imagePath": "C:/wamp64/www/exam/assets/map",
     "map.height": 25,
@@ -14,9 +19,11 @@
     "map.tileWidth": 16,
     "map.width": 80,
     "openFiles": [
+        "environment-tiles.tsx"
     ],
     "project": "map.tiled-project",
     "recentFiles": [
+        "environment-tiles.tsx"
     ],
     "tileset.lastUsedFormat": "tsx",
     "tileset.tileSize": {

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Tile Maps - Phaser Platformer series</title>
+    <title>Lighting and Enhancements - Phaser Platformer series</title>
     <script src="js/phaser.min.js"></script>
     <link rel="stylesheet" href="css/screen.css" />
   </head>
@@ -13,7 +13,7 @@
 
       titleScreen.preload = function () {
         this.load.setBaseURL("assets/");
-        this.load.image("coin", "coin.jpg");
+        this.load.image("coin-particle", "coin.jpg");
         this.load.image("burst", "burst.png");
         this.load.image("hero", "hero.jpg");
 
@@ -24,7 +24,7 @@
       };
 
       titleScreen.create = function () {
-        var particles = this.add.particles("coin"),
+        var particles = this.add.particles("coin-particle"),
           emitZone = new Phaser.Geom.Rectangle(0, 0, 800, 400),
           emitter = particles.createEmitter({
             speed: { min: -40, max: 40 },
@@ -101,7 +101,7 @@
       var endScreen = new Phaser.Scene("endScreen");
 
       endScreen.create = function () {
-        var particles = this.add.particles("coin"),
+        var particles = this.add.particles("coin-particle"),
           emitZone = new Phaser.Geom.Rectangle(0, 0, 800, 600),
           emitter = particles.createEmitter({
             speed: { min: -40, max: 40 },
@@ -189,47 +189,81 @@
         this.heroColor = new Phaser.Display.Color(255, 255, 255);
         this.invincibleColor = new Phaser.Display.Color(56, 194, 239);
         this.coinTweens = [];
-        this.baddieVelocity = -100;
+        this.baddieVelocity = -60;
       };
 
       gameScene.preload = function () {
         this.load.setBaseURL("assets/");
         this.load.image("ground", "platform.jpg");
         this.load.image("collapsing-platform", "collapsing-platform.png");
-        this.load.image("one-way-platform", "one-way-platform.jpg");
-        this.load.image("one-way-platform-large", "one-way-platform-large.jpg");
-        this.load.image("coin", "coin.jpg");
+        this.load.image(
+          "collapsing-platform-hot",
+          "collapsing-platform-hot.png"
+        );
+        this.load.image("coin", "coin-8.png");
         this.load.image("hero", "hero.jpg");
         this.load.image("hero-small", "hero-16.jpg");
-        this.load.image("baddie", "baddie.jpg");
-        this.load.image("ladder", "ladder.png");
+        this.load.image("baddie", "baddie-16.jpg");
         this.load.image("laddertile", "laddertile.png");
-        this.load.image("shell", "shell.png");
-        this.load.image("powerup", "powerup.jpg");
-        this.load.image("question-mark-block", "question-mark-block.jpg");
-        this.load.image("empty-box", "empty-box.jpg");
-        this.load.image("dust", "dust.jpg");
-        this.load.image("spikes", "spikes-tile.png");
+        this.load.image("shell", "shell-small.jpg");
+        this.load.image("powerup", "powerup-16.jpg");
+        this.load.image("question-mark-block", "question-mark-block-16.jpg");
+        this.load.image("empty-box", "empty-box-16.jpg");
+        this.load.image("dust", "dust-small.jpg");
         this.load.image("heart", "heart.png");
         this.load.image("heart-filled", "heart-filled.png");
-        this.load.image("water", "water.png");
         this.load.image("logo", "digitherium-logo.jpg");
         this.load.image("touch-slider", "touch-slider.png");
         this.load.image("touch-knob", "touch-knob.png");
         this.load.image("tiles", "/map/environment-tiles.png");
-        this.load.tilemapTiledJSON("map", "/map/simplemap.json");
+        this.load.image("background-tiles", "/map/environment-background.png");
+        this.load.tilemapTiledJSON("map", "/map/enhancedmap.json");
+
+        this.load.spritesheet("lava", "map/lava.png", {
+          frameWidth: 32,
+          frameHeight: 32,
+        });
+
+        this.load.spritesheet("torch", "torch.png", {
+          frameWidth: 16,
+          frameHeight: 32,
+        });
+
+        this.load.spritesheet("eye-left", "eye-left.jpg", {
+          frameWidth: 16,
+          frameHeight: 16,
+        });
+
+        this.load.spritesheet("eye-right", "eye-right.jpg", {
+          frameWidth: 16,
+          frameHeight: 16,
+        });
       };
 
       gameScene.create = function () {
         this.addLogo();
+
         this.setupTileMap();
+
+        this.setupLights();
+
+        this.createCoins();
+        this.createLadders();
+        this.createBaddies();
+        this.createCollapsingPlatforms();
+
+        this.createLava();
+        this.createTorches();
+        this.createPowerups();
+        this.createShells();
         this.createPlayer();
+        this.createFinish();
+
         this.setupControls();
         this.createHUD();
         this.createEmitter();
         this.setupCamera();
-
-        this.physics.add.collider(this.player, this.ground);
+        this.setupCollions();
       };
 
       gameScene.addLogo = function () {
@@ -243,8 +277,10 @@
         this.map = this.make.tilemap({ key: "map" });
 
         tiles = this.map.addTilesetImage("environment-tiles", "tiles");
-
-        this.map.setCollisionBetween(0, 600);
+        bgTiles = this.map.addTilesetImage(
+          "environment-background",
+          "background-tiles"
+        );
 
         this.physics.world.setBounds(
           0,
@@ -253,36 +289,185 @@
           this.map.heightInPixels
         );
 
-        this.ground = this.map.createLayer("platforms", tiles, 0, 0);
-        this.foreground = this.map.createLayer("foreground", tiles, 0, 0);
+        this.background = this.map
+          .createLayer("background", bgTiles)
+          .setPipeline("Light2D");
+        this.ground = this.map
+          .createLayer("platforms", tiles)
+          .setPipeline("Light2D");
+        this.lava = this.map.createLayer("lava", tiles).setPipeline("Light2D");
+        this.foreground = this.map.createLayer("grass", tiles);
+
         this.foreground.depth = 10;
+
+        this.map.setCollisionBetween(0, 600, true, false, "platforms");
+        this.map.setCollisionBetween(0, 600, true, false, "lava");
+      };
+
+      gameScene.createCoins = function () {
+        this.coins = this.physics.add.staticGroup();
+        this.coinsLayer = this.map.getObjectLayer("coins");
+        this.coinsLayer.objects.forEach((element) => this.placeCoins(element));
+      };
+
+      gameScene.createLadders = function () {
+        this.ladders = this.physics.add.staticGroup();
+        this.laddersLayer = this.map.getObjectLayer("ladders");
+        this.laddersLayer.objects.forEach((element) =>
+          this.placeLadders(element)
+        );
+        this.laddersLayer.depth = 1;
+      };
+
+      gameScene.placeLavaBubbles = function (tile) {
+        if (tile.index != -1) {
+          var bubbles = this.bubblingLava.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            "lava"
+          );
+
+          bubbles.body.setSize(32, 16);
+
+          bubbles.anims.play("bubbling", true);
+
+          bubbles.depth = 2;
+
+          bubbles.setPipeline("Light2D");
+        }
+      };
+
+      gameScene.placeTorches = function (tile, sprite, radius, animationKey) {
+        if (tile.index != -1) {
+          this.lights
+            .addLight(tile.x + tile.width / 2, tile.y - tile.height, radius)
+            .setIntensity(2.0);
+
+          var torch = this.add.sprite(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            sprite
+          );
+
+          torch.anims.play(animationKey, true);
+
+          torch.setPipeline("Light2D");
+        }
+      };
+
+      gameScene.createBaddies = function () {
+        this.baddies = this.physics.add.group();
+        this.baddiesLayer = this.map.getObjectLayer("baddies");
+        this.baddiesLayer.objects.forEach((element) =>
+          this.placeBaddies(element)
+        );
+      };
+
+      gameScene.createCollapsingPlatforms = function () {
+        this.collapsingPlatforms = this.physics.add.staticGroup();
+        this.collapsingPlatformsLayer = this.map.getObjectLayer("collapsing");
+        this.collapsingPlatformsLayer.objects.forEach((element) =>
+          this.placeCollapsingPlatforms(element)
+        );
+      };
+
+      gameScene.createPowerups = function () {
+        this.powerupBoxes = this.physics.add.group();
+        this.powerups = this.physics.add.group();
+        this.powerupBoxesLayer = this.map.getObjectLayer("power-ups");
+        this.powerupBoxesLayer.objects.forEach((element) =>
+          this.placePowerups(element)
+        );
+      };
+
+      gameScene.createTorches = function () {
+        this.anims.create({
+          key: "flicker",
+          frames: this.anims.generateFrameNumbers("torch", {
+            start: 0,
+            end: 2,
+          }),
+          frameRate: 3,
+          repeat: -1,
+        });
+
+        this.anims.create({
+          key: "flicker-right",
+          frames: this.anims.generateFrameNumbers("eye-right", {
+            start: 0,
+            end: 2,
+          }),
+          frameRate: 3,
+          repeat: -1,
+        });
+
+        this.anims.create({
+          key: "flicker-left",
+          frames: this.anims.generateFrameNumbers("eye-left", {
+            start: 0,
+            end: 2,
+          }),
+          frameRate: 3,
+          repeat: -1,
+        });
+
+        this.torchesLayer = this.map.getObjectLayer("torches");
+        this.torchesLayer.objects.forEach((element) =>
+          this.placeTorches(element, "torch", 100, "flicker")
+        );
+
+        this.leftEyeLayer = this.map.getObjectLayer("eye-left");
+        this.leftEyeLayer.objects.forEach((element) =>
+          this.placeTorches(element, "left-eye", 150, "flicker-left")
+        );
+
+        this.rightEyeLayer = this.map.getObjectLayer("eye-right");
+        this.rightEyeLayer.objects.forEach((element) =>
+          this.placeTorches(element, "right-eye", 150, "flicker-right")
+        );
+      };
+
+      gameScene.createLava = function () {
+        this.anims.create({
+          key: "bubbling",
+          frames: this.anims.generateFrameNumbers("lava", { start: 0, end: 2 }),
+          frameRate: 3,
+          repeat: -1,
+        });
+
+        this.bubblingLava = this.physics.add.staticGroup();
+        this.bubblingLavaLayer = this.map.getObjectLayer("bubbling-lava");
+        this.bubblingLavaLayer.objects.forEach((element) =>
+          this.placeLavaBubbles(element)
+        );
+      };
+
+      gameScene.createShells = function () {
+        this.shells = this.physics.add.group();
+        this.shellsLayer = this.map.getObjectLayer("shells");
+        this.shellsLayer.objects.forEach((element) =>
+          this.placeShells(element)
+        );
       };
 
       gameScene.createPlayer = function () {
-        this.player = this.physics.add.sprite(40, 200, "hero-small");
-        this.player.setOrigin(0.5, 0.5);
-        this.player.setDrag(1);
-        this.player.setCollideWorldBounds(true);
+        this.playerLayer = this.map.getObjectLayer("player");
+        this.playerLayer.objects.forEach((element) =>
+          this.placePlayer(element)
+        );
+      };
 
-        this.player.invulnerable = false;
-
-        this.player.invincible = false;
-
-        this.player.hearts = this.maxHearts;
-
-        this.player.setBounce(0);
-
-        this.player.body.maxVelocity.x = this.maxPlayerSpeed;
-        this.player.body.maxVelocity.y = 500;
-        this.player.isBig = false;
-        this.player.isChangingSize = false;
+      gameScene.createFinish = function () {
+        this.goal = this.physics.add.staticGroup();
+        this.goalLayer = this.map.getObjectLayer("goal");
+        this.goalLayer.objects.forEach((element) => this.placeGoal(element));
       };
 
       gameScene.createHUD = function () {
-        this.scoreCoin = this.add.sprite(30, 32, "coin");
+        this.scoreCoin = this.add.sprite(30, 34, "coin");
         this.scoreCoin.setOrigin(0.5, 0.5);
-        this.scoreCoin.scaleX = 0.5;
-        this.scoreCoin.scaleY = 0.5;
+        this.scoreCoin.scaleX = 1;
+        this.scoreCoin.scaleY = 1;
         this.scoreText = this.add.text(46, 17, "0", {
           fontFamily: "Josefin Sans",
           fontSize: "24px",
@@ -294,13 +479,13 @@
           heartOutline2 = this.add.sprite(720, 38, "heart"),
           heartOutline3 = this.add.sprite(680, 38, "heart");
 
-        heartOutlines = [heartOutline1, heartOutline2, heartOutline3];
+        this.heartOutlines = [heartOutline1, heartOutline2, heartOutline3];
 
         heart1 = this.add.sprite(760, 38, "heart-filled");
         heart2 = this.add.sprite(720, 38, "heart-filled");
         heart3 = this.add.sprite(680, 38, "heart-filled");
 
-        hearts = [heart1, heart2, heart3];
+        this.hearts = [heart1, heart2, heart3];
 
         hud = this.add.container(0, 0, [
           this.scoreCoin,
@@ -339,56 +524,352 @@
         this.emitter.pause();
       };
 
-      function hitBaddie(player, baddie) {
-        if (player.invincible) {
-          baddie.disableBody(false, false);
-
-          var tween = this.tweens.add({
-            targets: baddie,
-            alpha: 0.3,
-            y: "-=150",
-            scaleX: 2.5,
-            scaleY: 2.5,
-            angle: 180,
+      gameScene.placeCoins = function (tile) {
+        if (tile.index != -1) {
+          var coin = gameScene.coins.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            "coin"
+          );
+          this.tweens.add({
+            targets: coin,
+            angle: 360,
+            repeat: -1,
             ease: "Linear",
-            duration: 200,
-            onComplete: function () {
-              destroyGameObject(baddie);
-            },
+            duration: 3000,
           });
+        }
+      };
+
+      gameScene.placeGoal = function (tile) {
+        if (tile.index != -1) {
+          var finish = this.goal.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            "hero-small"
+          );
+          this.goal.setVisible(false);
+          this.goalParticles = this.add.particles("coin");
+          this.goalEmitter = this.goalParticles.createEmitter({
+            x: tile.x - tile.width / 2,
+            y: tile.y - 2,
+            lifespan: 1500,
+            speedY: { min: -60, max: -20 },
+            speedX: { min: -40, max: 40 },
+            angle: { min: 180, max: 360 },
+            gravityY: -20,
+            scale: { start: 0.8, end: 0 },
+            alpha: { start: 1, end: 0 },
+            blendMode: "SCREEN",
+          });
+        }
+      };
+
+      gameScene.placeShells = function (tile) {
+        if (tile.index != -1) {
+          var shell = this.shells.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            "shell"
+          );
+          shell.setOrigin(0.5, 0.5);
+          shell.setCollideWorldBounds(true);
+          shell.setPipeline("Light2D");
+        }
+      };
+
+      gameScene.placePlayer = function (tile) {
+        this.player = this.physics.add.sprite(
+          tile.x + tile.width / 2,
+          tile.y - tile.height / 2,
+          "hero-small"
+        );
+        this.player.setPipeline("Light2D");
+        this.player.setOrigin(0.5, 0.5);
+        this.player.setDrag(1);
+        this.player.setCollideWorldBounds(true);
+
+        this.player.invulnerable = false;
+
+        this.player.invincible = false;
+
+        this.player.hearts = this.maxHearts;
+
+        this.player.setBounce(0);
+
+        this.player.body.maxVelocity.x = this.maxPlayerSpeed;
+        this.player.body.maxVelocity.y = 500;
+        this.player.isBig = false;
+        this.player.isChangingSize = false;
+        this.depth = 2;
+      };
+
+      gameScene.placePowerups = function (tile) {
+        if (tile.index != -1) {
+          var box = this.powerupBoxes.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            "question-mark-block"
+          );
+          box.depth = 2;
+          box.setPipeline("Light2D");
+          var powerup = this.powerups.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            "powerup"
+          );
+          powerup.setOrigin(0.5, 0.5);
+          powerup.depth = 1;
+
+          powerup.enableBody = false;
+          powerup.visible = false;
+          powerup.body.setAllowGravity(false);
+
+          box.body.setAllowGravity(false);
+          box.body.setImmovable(true);
+
+          box.powerup = powerup;
+        }
+      };
+
+      gameScene.placeBaddies = function (tile) {
+        if (tile.index != -1) {
+          var maxdistance = 0;
+          if (tile.properties != null)
+            maxdistance = tile.properties.maxdistance * tile.width;
+          var baddie = this.baddies.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            "baddie"
+          );
+          baddie.setOrigin(0.5, 0.5);
+          baddie.setPipeline("Light2D");
+          baddie.setCollideWorldBounds(true);
+          baddie.previousX = baddie.x;
+          baddie.body.velocity.x = this.baddieVelocity;
+          baddie.maxDistance = maxdistance;
+          baddie.direction = -1;
+        }
+      };
+
+      gameScene.placeShells = function (tile) {
+        if (tile.index != -1) {
+          var shell = this.shells.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            "shell"
+          );
+          shell.setOrigin(0.5, 0.5);
+          shell.setCollideWorldBounds(true);
+        }
+      };
+
+      gameScene.placeLadders = function (tile) {
+        if (tile.index != -1) {
+          var ladder = this.ladders.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            "laddertile"
+          );
+        }
+      };
+
+      gameScene.placeCollapsingPlatforms = function (tile) {
+        if (tile.index != -1) {
+          var sprite = "collapsing-platform";
+
+          if (tile.properties != null && tile.properties.ishot)
+            sprite = "collapsing-platform-hot";
+          var platform = this.collapsingPlatforms.create(
+            tile.x + tile.width / 2,
+            tile.y - tile.height / 2,
+            sprite
+          );
+        }
+      };
+
+      gameScene.baddieDie = function (baddie) {
+        baddie.disableBody(false, false);
+
+        var tween = this.tweens.add({
+          targets: baddie,
+          alpha: 0.3,
+          scaleX: 1.5,
+          scaleY: 1.5,
+          ease: "Linear",
+          duration: 200,
+          onComplete: function () {
+            gameScene.destroyGameObject(baddie);
+          },
+        });
+      };
+
+      gameScene.setupCollions = function () {
+        this.physics.add.collider(this.player, this.ground);
+        this.physics.add.collider(this.baddies, this.ground);
+
+        this.physics.add.collider(
+          this.player,
+          this.collapsingPlatforms,
+          this.shakePlatform,
+          this.checkOneWay,
+          this
+        );
+        this.physics.add.collider(this.baddies, this.collapsingPlatforms);
+
+        this.physics.add.collider(
+          this.player,
+          this.lava,
+          this.playerHit,
+          null,
+          this
+        );
+        this.physics.add.collider(
+          this.baddies,
+          this.lava,
+          this.baddieDie,
+          null,
+          this
+        );
+
+        this.physics.add.overlap(
+          this.player,
+          this.baddies,
+          this.hitBaddie,
+          null,
+          this
+        );
+        this.physics.add.overlap(
+          this.player,
+          this.coins,
+          this.collectCoin,
+          null,
+          this
+        );
+
+        this.physics.add.collider(
+          this.player,
+          this.powerupBoxes,
+          this.hitQuestionMarkBlock,
+          null,
+          this
+        );
+        this.physics.add.collider(this.powerups, this.ground);
+        this.physics.add.overlap(
+          this.player,
+          this.powerups,
+          this.goInvincibile,
+          null,
+          this
+        );
+
+        this.physics.add.overlap(
+          this.player,
+          this.ladders,
+          this.isOnLadder,
+          null,
+          this
+        );
+        this.physics.add.collider(
+          this.player,
+          this.ladders,
+          null,
+          this.checkLadderTop,
+          this
+        );
+
+        this.physics.add.collider(
+          this.shells,
+          this.ground,
+          this.shellWallHit,
+          null,
+          this
+        );
+        this.physics.add.collider(
+          this.player,
+          this.shells,
+          this.shellHit,
+          null,
+          this
+        );
+        this.physics.add.overlap(
+          this.shells,
+          this.baddies,
+          this.shellHitBaddie,
+          null,
+          this
+        );
+
+        this.physics.add.overlap(
+          this.player,
+          this.goal,
+          this.finishLevel,
+          null,
+          this
+        );
+      };
+
+      gameScene.setupLights = function () {
+        this.lights.enable();
+
+        this.lights.setAmbientColor(0x666666);
+
+        this.lights.addLight(0, 340, 300).setColor(0xffffff).setIntensity(3.0);
+
+        this.lights
+          .addLight(440, 360, 100)
+          .setColor(0xeb840b)
+          .setIntensity(1.0);
+        this.lights
+          .addLight(540, 360, 100)
+          .setColor(0xffea00)
+          .setIntensity(1.5);
+        this.lights
+          .addLight(640, 360, 100)
+          .setColor(0xffea00)
+          .setIntensity(1.5);
+        this.lights
+          .addLight(740, 360, 100)
+          .setColor(0xeb840b)
+          .setIntensity(1.0);
+
+        this.lights.addLight(1280, 300, 300).setIntensity(2.0);
+
+        this.lights
+          .addLight(2192, 60, 300)
+          .setColor(0xfad050)
+          .setIntensity(4.0);
+
+        this.lights
+          .addLight(2032, 400, 80)
+          .setColor(0xffea00)
+          .setIntensity(3.0);
+      };
+
+      gameScene.hitBaddie = function (player, baddie) {
+        if (player.invincible) {
+          this.baddieDie(baddie);
         } else {
           if (
             baddie.body.touching.up &&
             !baddie.hit &&
             !player.isChangingSize
           ) {
-            baddie.disableBody(false, false);
             player.setVelocityY(this.jumpVelocity);
-
-            var tween = this.tweens.add({
-              targets: baddie,
-              alpha: 0.3,
-              scaleX: 1.5,
-              scaleY: 1.5,
-              ease: "Linear",
-              duration: 200,
-              onComplete: function () {
-                destroyGameObject(baddie);
-              },
-            });
+            this.baddieDie(baddie);
           } else {
-            playerHit.call(this, player, baddie);
+            this.playerHit(player, baddie);
           }
         }
-      }
+      };
 
-      function playerHit(player, obstacle) {
+      gameScene.playerHit = function (player, obstacle) {
         if (!player.invulnerable && !player.invincible) {
           player.invulnerable = true;
 
           var currentHeartCount = player.hearts,
-            currentHeart = hearts[currentHeartCount - 1],
-            currentHeartOutline = heartOutlines[currentHeartCount - 1];
+            currentHeart = this.hearts[currentHeartCount - 1],
+            currentHeartOutline = this.heartOutlines[currentHeartCount - 1];
 
           var heartFade = this.tweens.add({
             targets: currentHeart,
@@ -435,7 +916,7 @@
               ease: "Linear",
               duration: 200,
               onComplete: function () {
-                restartGame(this);
+                gameScene.restartGame(this);
               },
               onCompleteScope: this,
             });
@@ -455,7 +936,7 @@
                 ease: "Linear",
                 duration: 100,
                 onComplete: function () {
-                  shrinkHero();
+                  gameScene.shrinkHero();
                 },
               });
             } else {
@@ -472,16 +953,15 @@
             }
 
             var timer = this.time.delayedCall(
-              gameScene.vulnerableTime,
-              playerVulnerable,
-              [this]
+              this.vulnerableTime,
+              this.playerVulnerable
             );
           }
         }
-      }
+      };
 
-      function playerVulnerable(game) {
-        var death = game.tweens.add({
+      gameScene.playerVulnerable = function () {
+        var death = gameScene.tweens.add({
           targets: gameScene.player,
           alpha: 1,
           ease: "Linear",
@@ -491,9 +971,9 @@
           },
           onCompleteScope: this,
         });
-      }
+      };
 
-      function shellHitBaddie(shell, baddie) {
+      gameScene.shellHitBaddie = function (shell, baddie) {
         if (!baddie.hit) {
           baddie.disableBody(false, false);
 
@@ -505,20 +985,20 @@
             ease: "Linear",
             duration: 200,
             onComplete: function () {
-              destroyGameObject(baddie);
+              gameScene.destroyGameObject(baddie);
             },
           });
-          destroyShell.call(this, shell);
+          this.destroyShell(shell);
         }
-      }
+      };
 
-      function shellWallHit(shell, wall) {
+      gameScene.shellWallHit = function (shell, wall) {
         if (shell.body.onWall()) {
-          destroyShell.call(this, shell);
+          this.destroyShell(shell);
         }
-      }
+      };
 
-      function shellHit(player, shell) {
+      gameScene.shellHit = function (player, shell) {
         var threshold = shell.x + shell.width / 2,
           playerX = player.x + player.width / 2;
 
@@ -536,9 +1016,13 @@
         }
 
         player.body.velocity.y = -200;
-      }
+      };
 
-      function destroyShell(shell) {
+      gameScene.finishLevel = function (player, goal) {
+        game.scene.switch("game", "endScreen");
+      };
+
+      gameScene.destroyShell = function (shell) {
         shell.disableBody(false, false);
 
         var destroyShell = this.tweens.add({
@@ -551,14 +1035,14 @@
           ease: "Linear",
           duration: 200,
           onComplete: function () {
-            destroyGameObject(shell);
+            gameScene.destroyGameObject(shell);
           },
         });
-      }
+      };
 
-      function restartGame(scene) {
+      gameScene.restartGame = function (scene) {
         game.scene.switch("game", "endScreen");
-      }
+      };
 
       gameScene.setupControls = function () {
         this.input.addPointer(1);
@@ -574,48 +1058,49 @@
         this.touchSlider.setScrollFactor(0);
       };
 
-      function moveLeft(acceleration) {
-        if (gameScene.standing) {
-          gameScene.player.setAccelerationX(-acceleration);
+      gameScene.moveLeft = function (acceleration) {
+        if (this.standing) {
+          this.player.setAccelerationX(-acceleration);
         } else {
-          gameScene.player.setAccelerationX(-acceleration / 3);
+          this.player.setAccelerationX(-acceleration / 3);
         }
-      }
+      };
 
-      function moveRight(acceleration) {
-        if (gameScene.standing) {
-          gameScene.player.setAccelerationX(acceleration);
+      gameScene.moveRight = function (acceleration) {
+        if (this.standing) {
+          this.player.setAccelerationX(acceleration);
         } else {
-          gameScene.player.setAccelerationX(acceleration / 3);
+          this.player.setAccelerationX(acceleration / 3);
         }
-      }
+      };
 
-      function switchDirection(baddie) {
+      gameScene.switchDirection = function (baddie) {
         if (baddie.body.velocity.x == 0) {
           if (baddie.direction == -1)
-            baddie.body.velocity.x = gameScene.baddieVelocity * -1;
+            baddie.body.velocity.x = this.baddieVelocity * -1;
           if (baddie.direction == 1)
-            baddie.body.velocity.x = gameScene.baddieVelocity;
+            baddie.body.velocity.x = this.baddieVelocity;
         } else {
           baddie.body.velocity.x *= -1;
         }
         baddie.direction *= -1;
 
         baddie.previousX = baddie.x;
-      }
+      };
 
-      function isOnLadder(player, ladder) {
+      gameScene.isOnLadder = function (player, ladder) {
         if (
           Math.floor(player.y) + player.height / 2 >
           ladder.y - ladder.height / 2
         ) {
           this.onLadder = true;
+
           this.currentLadder = ladder;
           player.body.setAllowGravity(false);
         }
-      }
+      };
 
-      function checkLadderTop(player, ladder) {
+      gameScene.checkLadderTop = function (player, ladder) {
         /* We check here if our player is higher up than the ladder i.e. if the player is on top of the ladder
         the sprites are positioned from their centres, so we have to add or subtract half their height to find the heroes feet and the top of the ladder. 
         With the player we add half the height so we are checking the positon of their feet. With the ladder we add half the height so we are checking the top of the ladder. We also round the two values differently, floor for the player to give us the smallest number possible and ceil for the ladder height to give us the highest number possible. This deals with any subpixel values.
@@ -633,19 +1118,19 @@
         } else {
           return false;
         }
-      }
+      };
 
-      function checkOneWay(player, oneway) {
+      gameScene.checkOneWay = function (player, oneway) {
         if (player.y < oneway.y) {
           return true;
         }
 
         return false;
-      }
+      };
 
-      function shakePlatform(player, platform) {
+      gameScene.shakePlatform = function (player, platform) {
         if (player.body.blocked.down) {
-          gameScene.camera.shake(200, 0.001);
+          this.camera.shake(200, 0.001);
 
           var ourScene = this;
 
@@ -660,13 +1145,13 @@
             ease: "Linear",
             duration: 50,
             onComplete: function () {
-              destroyPlatform.call(ourScene, platform);
+              ourScene.destroyPlatform(platform);
             },
           });
         }
-      }
+      };
 
-      function destroyPlatform(platform) {
+      gameScene.destroyPlatform = function (platform) {
         var tween = this.tweens.add({
           targets: platform,
           alpha: 0,
@@ -674,10 +1159,10 @@
           ease: "Linear",
           duration: 100,
           onComplete: function () {
-            destroyGameObject(platform);
+            gameScene.destroyGameObject(platform);
           },
         });
-      }
+      };
 
       gameScene.update = function () {
         for (var i = 0; i < this.coinTweens.length; i++) {
@@ -698,10 +1183,23 @@
           (time = d.getTime());
 
         if (cursors.left.isDown) {
-          moveLeft(this.acceleration);
+          this.moveLeft(this.acceleration);
         } else if (cursors.right.isDown) {
-          moveRight(this.acceleration);
+          this.moveRight(this.acceleration);
         }
+
+        this.baddies.getChildren().forEach(function (theBaddie) {
+          if (
+            Math.abs(theBaddie.x - theBaddie.previousX) >= theBaddie.maxDistance
+          ) {
+            this.switchDirection(theBaddie);
+          } else {
+            if (theBaddie.direction == -1 && theBaddie.body.blocked.left)
+              this.switchDirection(theBaddie);
+            if (theBaddie.direction == 1 && theBaddie.body.blocked.right)
+              this.switchDirection(theBaddie);
+          }
+        }, this);
 
         if (this.input.pointer1.isDown || this.input.pointer2.isDown) {
           var leftHalf = config.width / 2;
@@ -773,8 +1271,8 @@
                     ease: "Power1",
                     duration: 300,
                   });
-                  if (myMovePointer.x < startX) moveLeft(tmpAcceleration);
-                  if (myMovePointer.x > startX) moveRight(tmpAcceleration);
+                  if (myMovePointer.x < startX) this.moveLeft(tmpAcceleration);
+                  if (myMovePointer.x > startX) this.moveRight(tmpAcceleration);
                 } else {
                   this.touchMoving = false;
 
@@ -818,7 +1316,7 @@
 
                 if (Math.floor(this.prevPos) > Math.floor(this.yPos)) {
                   if (!myMovePointer) {
-                    this.player.x = this.ladder.x;
+                    this.player.x = this.currentLadder.x;
 
                     this.player.setVelocityX(0);
                     this.player.setVelocityY(-100);
@@ -827,7 +1325,7 @@
 
                 if (Math.floor(this.prevPos) < Math.floor(this.yPos)) {
                   if (!myMovePointer) {
-                    this.player.x = this.ladder.x;
+                    this.player.x = this.currentLadder.x;
 
                     this.player.setVelocityX(0);
                     this.player.setVelocityY(100);
@@ -847,9 +1345,6 @@
           this.touchSlider.alpha = 0;
           startX = 0;
           this.touchMoving = false;
-
-          if (this.onLadder) {
-          }
         }
 
         if (
@@ -926,7 +1421,7 @@
         this.onLadder = false;
       };
 
-      function collectCoin(player, coin) {
+      gameScene.collectCoin = function (player, coin) {
         coin.disableBody(false, false);
 
         var collectCoinTween = this.tweens.add({
@@ -940,7 +1435,7 @@
           ease: "Linear",
           duration: 500,
           onComplete: function () {
-            destroyGameObject(coin);
+            gameScene.destroyGameObject(coin);
             gameScene.coinTweens.shift();
           },
         });
@@ -949,36 +1444,36 @@
 
         if (this.scoreCoinTimeline) {
           if (this.scoreCoinTimeline.progress == 1) {
-            animateScoreCoin(this);
+            this.animateScoreCoin();
           }
         } else {
-          animateScoreCoin(this);
+          this.animateScoreCoin();
         }
         gameScene.score += 10;
         gameScene.scoreText.setText(gameScene.score);
-      }
+      };
 
-      function growHero() {
-        gameScene.player.setTexture("hero");
+      gameScene.growHero = function () {
+        this.player.setTexture("hero");
 
-        gameScene.player.setSize(32, 32);
+        this.player.setSize(32, 32);
 
-        gameScene.player.isBig = true;
+        this.player.isBig = true;
 
-        gameScene.player.isChangingSize = false;
-      }
+        this.player.isChangingSize = false;
+      };
 
-      function shrinkHero() {
-        gameScene.player.setTexture("hero-small");
+      gameScene.shrinkHero = function () {
+        this.player.setTexture("hero-small");
 
-        gameScene.player.setSize(22, 22);
+        this.player.setSize(22, 22);
 
-        gameScene.player.isBig = false;
+        this.player.isBig = false;
 
-        gameScene.player.isChangingSize = false;
-      }
+        this.player.isChangingSize = false;
+      };
 
-      function collectMushroom(player, mushroom) {
+      gameScene.collectMushroom = function (player, mushroom) {
         player.body.velocity.x = 0;
         player.body.velocity.y = 0;
 
@@ -995,7 +1490,7 @@
           ease: "Linear",
           duration: 100,
           onComplete: function () {
-            growHero();
+            gameScene.growHero();
           },
         });
 
@@ -1008,12 +1503,12 @@
           ease: "Linear",
           duration: 500,
           onComplete: function () {
-            destroyGameObject(mushroom);
+            gameScene.destroyGameObject(mushroom);
           },
         });
-      }
+      };
 
-      function hitQuestionMarkBlock(player, block) {
+      gameScene.hitQuestionMarkBlock = function (player, block) {
         if (block.body.touching.down && !block.hit) {
           block.hit = true;
 
@@ -1025,7 +1520,7 @@
             ease: "Linear",
             duration: 300,
             onComplete: function () {
-              emptyQuestionBlock(block);
+              gameScene.emptyQuestionBlock(block);
             },
           });
 
@@ -1037,9 +1532,9 @@
             duration: 100,
           });
         }
-      }
+      };
 
-      function emptyQuestionBlock(block) {
+      gameScene.emptyQuestionBlock = function (block) {
         block.setTexture("empty-box");
 
         block.powerup.enableBody = true;
@@ -1048,14 +1543,14 @@
 
         if (Math.floor(Math.random() * 1)) block.powerup.setVelocityX(-80);
         else block.powerup.setVelocityX(80);
-      }
+      };
 
-      function goInvincibile(player, invicibility) {
+      gameScene.goInvincibile = function (player, invicibility) {
         invicibility.disableBody(false, false);
 
         player.body.maxVelocity.x = this.superPlayerSpeed;
 
-        gameScene.emitter.resume();
+        this.emitter.resume();
 
         this.tweens.addCounter({
           from: 0,
@@ -1080,7 +1575,7 @@
             player.setTint(color);
           },
           onComplete: function () {
-            resetInvincibility();
+            gameScene.resetInvincibility();
           },
         });
 
@@ -1093,44 +1588,44 @@
           ease: "Linear",
           duration: 500,
           onComplete: function () {
-            destroyGameObject(invicibility);
+            gameScene.destroyGameObject(invicibility);
           },
         });
 
         player.invincible = true;
-      }
+      };
 
-      function resetInvincibility() {
-        gameScene.player.invincible = false;
+      gameScene.resetInvincibility = function () {
+        this.player.invincible = false;
 
-        gameScene.player.body.maxVelocity.x = gameScene.maxPlayerSpeed;
+        this.player.body.maxVelocity.x = this.maxPlayerSpeed;
 
-        gameScene.emitter.pause();
-        gameScene.emitter.killAll();
-      }
+        this.emitter.pause();
+        this.emitter.killAll();
+      };
 
-      function animateScoreCoin(game) {
-        this.scoreCoinTimeline = game.tweens.timeline({
+      gameScene.animateScoreCoin = function () {
+        this.scoreCoinTimeline = this.tweens.timeline({
           targets: gameScene.scoreCoin,
           duration: 100,
           tweens: [
             {
-              scaleX: 0.8,
-              scaleY: 0.8,
+              scaleX: 1.5,
+              scaleY: 1.5,
               angle: "+=45",
             },
             {
-              scaleX: 0.5,
-              scaleY: 0.5,
+              scaleX: 1,
+              scaleY: 1,
               angle: "+=45",
             },
           ],
         });
-      }
+      };
 
-      function destroyGameObject(gameObject) {
+      gameScene.destroyGameObject = function (gameObject) {
         gameObject.destroy();
-      }
+      };
 
       var config = {
         type: Phaser.AUTO,
