@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tile Maps - Phaser Platformer series</title>
+    <script src="js/phaser.min.js"></script>
+    <link rel="stylesheet" href="css/screen.css" />
+  </head>
+
+  <body>
+    <script type="text/javascript">
+      var titleScreen = new Phaser.Scene("titleScreen");
+
+      titleScreen.preload = function () {
+        this.load.setBaseURL("assets/");
+        this.load.image("coin", "coin.jpg");
+        this.load.image("burst", "burst.png");
+        this.load.image("hero", "hero.jpg");
+
+        this.load.script(
+          "webfont",
+          "https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js"
+        );
+      };
+
+      titleScreen.create = function () {
+        var particles = this.add.particles("coin"),
+          emitZone = new Phaser.Geom.Rectangle(0, 0, 800, 400),
+          emitter = particles.createEmitter({
+            speed: { min: -40, max: 40 },
+            lifespan: 2000,
+
+            scale: { min: 0.1, max: 0.2 },
+            alpha: { start: 0.6, end: 0 },
+            blendMode: "ADD",
+            emitZone: { source: emitZone },
+            maxParticles: 0,
+          });
+
+        var burst = this.add.sprite(
+          config.width / 2,
+          config.height / 2 - 40,
+          "burst"
+        );
+        burst.setScale(0.7);
+
+        var burstTween = this.tweens.add({
+          targets: burst,
+          angle: 360,
+          repeat: -1,
+          ease: "Linear",
+          duration: 12000,
+        });
+
+        this.add.sprite(config.width / 2, config.height / 2 - 40, "hero");
+
+        var scene = this;
+
+        WebFont.load({
+          google: {
+            families: ["Josefin Sans:700"],
+          },
+          active: function () {
+            scene.add
+              .text(
+                config.width / 2,
+                config.height / 2 + 70,
+                "SUPER SQUARE BOY!",
+                {
+                  fontFamily: "Josefin Sans",
+                  fontSize: 32,
+                  color: "#edbc45",
+                  align: "center",
+                }
+              )
+              .setShadow(4, 4, "#000000", 2, false, true)
+              .setOrigin(0.5);
+
+            scene.add
+              .text(
+                config.width / 2,
+                config.height / 2 + 120,
+                "CLICK OR TAP TO PLAY",
+                {
+                  fontFamily: "Josefin Sans",
+                  fontSize: 22,
+                  color: "#ef5e5e",
+                  align: "center",
+                }
+              )
+              .setShadow(4, 4, "#000000", 2, false, true)
+              .setOrigin(0.5);
+          },
+        });
+
+        this.input.on("pointerdown", function (pointer) {
+          game.scene.switch("titleScreen", "game");
+        });
+      };
+
+      var endScreen = new Phaser.Scene("endScreen");
+
+      endScreen.create = function () {
+        var particles = this.add.particles("coin"),
+          emitZone = new Phaser.Geom.Rectangle(0, 0, 800, 600),
+          emitter = particles.createEmitter({
+            speed: { min: -40, max: 40 },
+            lifespan: 2000,
+            scale: { min: 0.1, max: 0.2 },
+            alpha: { start: 0.6, end: 0 },
+            blendMode: "ADD",
+            emitZone: { source: emitZone },
+          });
+
+        var burst = this.add.sprite(
+          config.width / 2,
+          config.height / 2 - 40,
+          "burst"
+        );
+        burst.setScale(0.7);
+
+        var tween = this.tweens.add({
+          targets: burst,
+          angle: 360,
+          repeat: -1,
+          ease: "Linear",
+          duration: 12000,
+        });
+
+        this.add.sprite(config.width / 2, config.height / 2 - 40, "hero");
+
+        this.add
+          .text(config.width / 2, config.height / 2 + 70, "GAME OVER!", {
+            fontFamily: "Josefin Sans",
+            fontSize: 32,
+            align: "center",
+            color: "#edbc45",
+          })
+          .setShadow(4, 4, "#000000", 2, false, true)
+          .setOrigin(0.5);
+
+        this.add
+          .text(
+            config.width / 2,
+            config.height / 2 + 120,
+            "CLICK OR TAP TO PLAY AGAIN",
+            {
+              fontFamily: "Josefin Sans",
+              fontSize: 22,
+              align: "center",
+              color: "#ef5e5e",
+            }
+          )
+          .setShadow(4, 4, "#000000", 2, false, true)
+          .setOrigin(0.5);
+
+        this.input.on("pointerdown", function (pointer) {
+          gameScene.scene.restart();
+          game.scene.switch("endScreen", "game");
+        });
+      };
+
+      var gameScene = new Phaser.Scene("game");
+
+      gameScene.init = function () {
+        this.score = 0;
+        this.maxHearts = 3;
+        this.vulnerableTime = 1000;
+        this.acceleration = 600;
+        this.maxPlayerSpeed = 200;
+        this.superPlayerSpeed = 400;
+        this.jumpVelocity = -165;
+        this.jumpVelocitySmall = -165;
+        this.jumpVelocityBig = -330;
+        this.standing = true;
+        this.wasStanding = false;
+        this.onLadder = false;
+        this.edgeTimer = 0;
+        this.prevPos = 0;
+        this.yPos = 0;
+        this.touchJump = false;
+        this.touchJumpThreshold = 5;
+        this.touchMoving = false;
+        this.isTouch = false;
+        this.touchMoveThreshold = 3;
+        this.largeThumbMoveAcross = 25;
+        this.thumbSizeOffset = 60;
+        this.shellSpeed = 500;
+        this.heroColor = new Phaser.Display.Color(255, 255, 255);
+        this.invincibleColor = new Phaser.Display.Color(56, 194, 239);
+        this.coinTweens = [];
+        this.baddieVelocity = -100;
+      };
+
+      gameScene.preload = function () {
+        this.load.setBaseURL("assets/");
+        this.load.image("ground", "platform.jpg");
+        this.load.image("collapsing-platform", "collapsing-platform.png");
+        this.load.image("one-way-platform", "one-way-platform.jpg");
+        this.load.image("one-way-platform-large", "one-way-platform-large.jpg");
+        this.load.image("coin", "coin.jpg");
+        this.load.image("hero", "hero.jpg");
+        this.load.image("hero-small", "hero-16.jpg");
+        this.load.image("baddie", "baddie.jpg");
+        this.load.image("ladder", "ladder.png");
+        this.load.image("laddertile", "laddertile.png");
+        this.load.image("shell", "shell.png");
+        this.load.image("powerup", "powerup.jpg");
+        this.load.image("question-mark-block", "question-mark-block.jpg");
+        this.load.image("empty-box", "empty-box.jpg");
+        this.load.image("dust", "dust.jpg");
+        this.load.image("spikes", "spikes-tile.png");
+        this.load.image("heart", "heart.png");
+        this.load.image("heart-filled", "heart-filled.png");
+        this.load.image("water", "water.png");
+        this.load.image("logo", "digitherium-logo.jpg");
+        this.load.image("touch-slider", "touch-slider.png");
+        this.load.image("touch-knob", "touch-knob.png");
+        this.load.image("tiles", "/map/environment-tiles.png");
+        this.load.tilemapTiledJSON("map", "/map/simplemap.json");
+      };
+
+      gameScene.create = function () {
+        this.addLogo();
+        this.setupTileMap();
+        this.createPlayer();
+        this.setupControls();
+        this.createHUD();
+        this.createEmitter();
+        this.setupCamera();
+
+        this.physics.add.collider(this.player, this.ground);
+      };
+
+      gameScene.addLogo = function () {
+        var logo = this.add.sprite(config.width / 2, config.height / 2, "logo");
+        logo.alpha = 0.4;
+        logo.setScale(0.5);
+        logo.setScrollFactor(0.2);
+      };
+
+      gameScene.setupTileMap = function () {
+        this.map = this.make.tilemap({ key: "map" });
+
+        tiles = this.map.addTilesetImage("environment-tiles", "tiles");
+
+        this.map.setCollisionBetween(0, 600);
+
+        this.physics.world.setBounds(
+          0,
+          0,
+          this.map.widthInPixels,
+          this.map.heightInPixels
+        );
+
+        this.ground = this.map.createLayer("platforms", tiles, 0, 0);
+        this.foreground = this.map.createLayer("foreground", tiles, 0, 0);
+        this.foreground.depth = 10;
+      };
+
+      gameScene.createPlayer = function () {
+        this.player = this.physics.add.sprite(40, 200, "hero-small");
+        this.player.setOrigin(0.5, 0.5);
+        this.player.setDrag(1);
+        this.player.setCollideWorldBounds(true);
+
+        this.player.invulnerable = false;
+
+        this.player.invincible = false;
+
+        this.player.hearts = this.maxHearts;
+
+        this.player.setBounce(0);
+
+        this.player.body.maxVelocity.x = this.maxPlayerSpeed;
+        this.player.body.maxVelocity.y = 500;
+        this.player.isBig = false;
+        this.player.isChangingSize = false;
+      };
+
+      gameScene.createHUD = function () {
+        this.scoreCoin = this.add.sprite(30, 32, "coin");
+        this.scoreCoin.setOrigin(0.5, 0.5);
+        this.scoreCoin.scaleX = 0.5;
+        this.scoreCoin.scaleY = 0.5;
+        this.scoreText = this.add.text(46, 17, "0", {
+          fontFamily: "Josefin Sans",
+          fontSize: "24px",
+          fill: "#fff",
+        });
+        this.scoreCoin.setScrollFactor(0);
+
+        var heartOutline1 = this.add.sprite(760, 38, "heart"),
+          heartOutline2 = this.add.sprite(720, 38, "heart"),
+          heartOutline3 = this.add.sprite(680, 38, "heart");
+
+        heartOutlines = [heartOutline1, heartOutline2, heartOutline3];
+
+        heart1 = this.add.sprite(760, 38, "heart-filled");
+        heart2 = this.add.sprite(720, 38, "heart-filled");
+        heart3 = this.add.sprite(680, 38, "heart-filled");
+
+        hearts = [heart1, heart2, heart3];
+
+        hud = this.add.container(0, 0, [
+          this.scoreCoin,
+          this.scoreText,
+          heart1,
+          heart2,
+          heart3,
+          heartOutline1,
+          heartOutline2,
+          heartOutline3,
+        ]);
+
+        hud.setScrollFactor(0);
+
+        hud.depth = 11;
+      };
+
+      gameScene.setupCamera = function () {
+        this.camera = this.cameras.main;
+        this.camera.setBounds(
+          0,
+          0,
+          this.map.widthInPixels,
+          this.map.heightInPixels
+        );
+        this.camera.startFollow(this.player, true, 0.1, 0.1);
+      };
+
+      gameScene.createEmitter = function () {
+        var particles = this.add.particles("dust");
+        this.emitter = particles.createEmitter();
+        this.emitter.setPosition(this.player.x, this.player.y);
+        this.emitter.setSpeed(150);
+        this.emitter.setBlendMode(Phaser.BlendModes.ADD);
+
+        this.emitter.pause();
+      };
+
+      function hitBaddie(player, baddie) {
+        if (player.invincible) {
+          baddie.disableBody(false, false);
+
+          var tween = this.tweens.add({
+            targets: baddie,
+            alpha: 0.3,
+            y: "-=150",
+            scaleX: 2.5,
+            scaleY: 2.5,
+            angle: 180,
+            ease: "Linear",
+            duration: 200,
+            onComplete: function () {
+              destroyGameObject(baddie);
+            },
+          });
+        } else {
+          if (
+            baddie.body.touching.up &&
+            !baddie.hit &&
+            !player.isChangingSize
+          ) {
+            baddie.disableBody(false, false);
+            player.setVelocityY(this.jumpVelocity);
+
+            var tween = this.tweens.add({
+              targets: baddie,
+              alpha: 0.3,
+              scaleX: 1.5,
+              scaleY: 1.5,
+              ease: "Linear",
+              duration: 200,
+              onComplete: function () {
+                destroyGameObject(baddie);
+              },
+            });
+          } else {
+            playerHit.call(this, player, baddie);
+          }
+        }
+      }
+
+      function playerHit(player, obstacle) {
+        if (!player.invulnerable && !player.invincible) {
+          player.invulnerable = true;
+
+          var currentHeartCount = player.hearts,
+            currentHeart = hearts[currentHeartCount - 1],
+            currentHeartOutline = heartOutlines[currentHeartCount - 1];
+
+          var heartFade = this.tweens.add({
+            targets: currentHeart,
+            alpha: 0,
+            scaleX: 0,
+            scaleY: 0,
+            ease: "Linear",
+            duration: 200,
+          });
+
+          var heartsTimeline = this.tweens.createTimeline();
+
+          heartsTimeline.add({
+            targets: currentHeartOutline,
+            scaleX: 0.5,
+            scaleY: 0.5,
+            ease: "Power1",
+            duration: 200,
+          });
+
+          heartsTimeline.add({
+            targets: currentHeartOutline,
+            scaleX: 1,
+            scaleY: 1,
+            ease: "Power1",
+            duration: 200,
+          });
+
+          heartsTimeline.play();
+
+          player.hearts -= 1;
+
+          if (player.hearts <= 0) {
+            player.disableBody(false, false);
+
+            var tween = this.tweens.add({
+              targets: player,
+              alpha: 0.3,
+              scaleX: 1.1,
+              scaleY: 1.1,
+              angle: 90,
+              x: player.x - 20,
+              y: player.y - 20,
+              ease: "Linear",
+              duration: 200,
+              onComplete: function () {
+                restartGame(this);
+              },
+              onCompleteScope: this,
+            });
+          } else {
+            if (player.isBig) {
+              player.body.velocity.x = 0;
+              player.body.velocity.y = -220;
+              player.isChangingSize = true;
+
+              var tween = this.tweens.add({
+                targets: player,
+                scaleX: 0.8,
+                scaleY: 0.8,
+                alpha: 0.3,
+                yoyo: 2,
+                repeat: 2,
+                ease: "Linear",
+                duration: 100,
+                onComplete: function () {
+                  shrinkHero();
+                },
+              });
+            } else {
+              player.body.velocity.x = 0;
+              player.body.velocity.y = -220;
+
+              var tween = this.tweens.add({
+                targets: player,
+                alpha: 0.3,
+                ease: "Linear",
+                duration: 200,
+                onCompleteScope: this,
+              });
+            }
+
+            var timer = this.time.delayedCall(
+              gameScene.vulnerableTime,
+              playerVulnerable,
+              [this]
+            );
+          }
+        }
+      }
+
+      function playerVulnerable(game) {
+        var death = game.tweens.add({
+          targets: gameScene.player,
+          alpha: 1,
+          ease: "Linear",
+          duration: 200,
+          onComplete: function () {
+            gameScene.player.invulnerable = false;
+          },
+          onCompleteScope: this,
+        });
+      }
+
+      function shellHitBaddie(shell, baddie) {
+        if (!baddie.hit) {
+          baddie.disableBody(false, false);
+
+          var tween = this.tweens.add({
+            targets: baddie,
+            alpha: 0.3,
+            scaleX: 1.5,
+            scaleY: 1.5,
+            ease: "Linear",
+            duration: 200,
+            onComplete: function () {
+              destroyGameObject(baddie);
+            },
+          });
+          destroyShell.call(this, shell);
+        }
+      }
+
+      function shellWallHit(shell, wall) {
+        if (shell.body.onWall()) {
+          destroyShell.call(this, shell);
+        }
+      }
+
+      function shellHit(player, shell) {
+        var threshold = shell.x + shell.width / 2,
+          playerX = player.x + player.width / 2;
+
+        if (shell.body.touching.up) {
+          if (playerX < threshold) shell.body.velocity.x = gameScene.shellSpeed;
+          else shell.body.velocity.x = -gameScene.shellSpeed;
+        }
+
+        if (shell.body.touching.left) {
+          shell.body.velocity.x = gameScene.shellSpeed;
+        }
+
+        if (shell.body.touching.right) {
+          shell.body.velocity.x = -gameScene.shellSpeed;
+        }
+
+        player.body.velocity.y = -200;
+      }
+
+      function destroyShell(shell) {
+        shell.disableBody(false, false);
+
+        var destroyShell = this.tweens.add({
+          targets: shell,
+          alpha: 0.3,
+          scaleX: 2,
+          scaleY: 2,
+          y: "-=100",
+          rotation: -360,
+          ease: "Linear",
+          duration: 200,
+          onComplete: function () {
+            destroyGameObject(shell);
+          },
+        });
+      }
+
+      function restartGame(scene) {
+        game.scene.switch("game", "endScreen");
+      }
+
+      gameScene.setupControls = function () {
+        this.input.addPointer(1);
+        cursors = this.input.keyboard.createCursorKeys();
+
+        sliderBar = this.add.sprite(0, 0, "touch-slider");
+        sliderKnob = this.add.sprite(0, 0, "touch-knob");
+
+        this.touchSlider = this.add.container(100, 450);
+        this.touchSlider.add(sliderBar);
+        this.touchSlider.add(sliderKnob);
+        this.touchSlider.alpha = 0;
+        this.touchSlider.setScrollFactor(0);
+      };
+
+      function moveLeft(acceleration) {
+        if (gameScene.standing) {
+          gameScene.player.setAccelerationX(-acceleration);
+        } else {
+          gameScene.player.setAccelerationX(-acceleration / 3);
+        }
+      }
+
+      function moveRight(acceleration) {
+        if (gameScene.standing) {
+          gameScene.player.setAccelerationX(acceleration);
+        } else {
+          gameScene.player.setAccelerationX(acceleration / 3);
+        }
+      }
+
+      function switchDirection(baddie) {
+        if (baddie.body.velocity.x == 0) {
+          if (baddie.direction == -1)
+            baddie.body.velocity.x = gameScene.baddieVelocity * -1;
+          if (baddie.direction == 1)
+            baddie.body.velocity.x = gameScene.baddieVelocity;
+        } else {
+          baddie.body.velocity.x *= -1;
+        }
+        baddie.direction *= -1;
+
+        baddie.previousX = baddie.x;
+      }
+
+      function isOnLadder(player, ladder) {
+        if (
+          Math.floor(player.y) + player.height / 2 >
+          ladder.y - ladder.height / 2
+        ) {
+          this.onLadder = true;
+          this.currentLadder = ladder;
+          player.body.setAllowGravity(false);
+        }
+      }
+
+      function checkLadderTop(player, ladder) {
+        /* We check here if our player is higher up than the ladder i.e. if the player is on top of the ladder
+        the sprites are positioned from their centres, so we have to add or subtract half their height to find the heroes feet and the top of the ladder. 
+        With the player we add half the height so we are checking the positon of their feet. With the ladder we add half the height so we are checking the top of the ladder. We also round the two values differently, floor for the player to give us the smallest number possible and ceil for the ladder height to give us the highest number possible. This deals with any subpixel values.
+        */
+        if (
+          Math.floor(player.y + player.height / 2) <=
+          Math.ceil(ladder.y - ladder.height / 2)
+        ) {
+          if (
+            cursors.down.isDown ||
+            Math.floor(this.prevPos) < Math.floor(this.yPos)
+          )
+            return false;
+          else return true;
+        } else {
+          return false;
+        }
+      }
+
+      function checkOneWay(player, oneway) {
+        if (player.y < oneway.y) {
+          return true;
+        }
+
+        return false;
+      }
+
+      function shakePlatform(player, platform) {
+        if (player.body.blocked.down) {
+          gameScene.camera.shake(200, 0.001);
+
+          var ourScene = this;
+
+          var tween = this.tweens.add({
+            targets: platform,
+            yoyo: true,
+            repeat: 10,
+            x: {
+              from: platform.x,
+              to: platform.x + 2 * 1,
+            },
+            ease: "Linear",
+            duration: 50,
+            onComplete: function () {
+              destroyPlatform.call(ourScene, platform);
+            },
+          });
+        }
+      }
+
+      function destroyPlatform(platform) {
+        var tween = this.tweens.add({
+          targets: platform,
+          alpha: 0,
+          y: "+=25",
+          ease: "Linear",
+          duration: 100,
+          onComplete: function () {
+            destroyGameObject(platform);
+          },
+        });
+      }
+
+      gameScene.update = function () {
+        for (var i = 0; i < this.coinTweens.length; i++) {
+          var tween = this.coinTweens[i];
+
+          if (tween)
+            tween.updateTo("x", this.camera.scrollX + this.scoreCoin.x);
+        }
+
+        if (this.player.isBig) this.jumpVelocity = this.jumpVelocityBig;
+        else this.jumpVelocity = this.jumpVelocitySmall;
+
+        this.emitter.setPosition(this.player.x, this.player.y);
+
+        (this.standing =
+          this.player.body.blocked.down || this.player.body.touching.down),
+          (d = new Date()),
+          (time = d.getTime());
+
+        if (cursors.left.isDown) {
+          moveLeft(this.acceleration);
+        } else if (cursors.right.isDown) {
+          moveRight(this.acceleration);
+        }
+
+        if (this.input.pointer1.isDown || this.input.pointer2.isDown) {
+          var leftHalf = config.width / 2;
+
+          if (
+            this.input.pointer1.x < leftHalf ||
+            this.input.pointer2.x < leftHalf
+          ) {
+            var myMovePointer = null;
+
+            if (
+              this.input.pointer1.x < leftHalf &&
+              this.input.pointer1.isDown
+            ) {
+              myMovePointer = this.input.pointer1;
+            }
+            if (
+              this.input.pointer2.x < leftHalf &&
+              this.input.pointer2.isDown
+            ) {
+              myMovePointer = this.input.pointer2;
+            }
+
+            if (myMovePointer) {
+              if (!this.touchSlider.alpha) {
+                this.touchSlider.alpha = 1;
+
+                this.touchSlider.x = myMovePointer.x;
+
+                this.touchSlider.y = myMovePointer.y - this.thumbSizeOffset;
+
+                startX = myMovePointer.x;
+                sliderKnob.x = 0;
+              }
+
+              if (myMovePointer.x < startX || myMovePointer.x > startX) {
+                var movement = 0;
+                if (myMovePointer.x < startX)
+                  movement = startX - myMovePointer.x;
+                if (myMovePointer.x > startX)
+                  movement = myMovePointer.x - startX;
+
+                if (movement > this.touchMoveThreshold) {
+                  this.touchMoving = true;
+
+                  this.isTouch = true;
+
+                  var sliderPos = 0;
+
+                  if (myMovePointer.x < startX)
+                    sliderPos = -(sliderBar.width / 4);
+
+                  if (myMovePointer.x > startX) sliderPos = sliderBar.width / 4;
+
+                  var tmpAcceleration = gameScene.acceleration / 8;
+
+                  if (movement > this.largeThumbMoveAcross) {
+                    if (myMovePointer.x < startX)
+                      sliderPos = -(sliderBar.width / 2);
+                    if (myMovePointer.x > startX)
+                      sliderPos = sliderBar.width / 2;
+
+                    tmpAcceleration = gameScene.acceleration;
+                  }
+
+                  var tween = this.tweens.add({
+                    targets: sliderKnob,
+                    x: sliderPos,
+                    ease: "Power1",
+                    duration: 300,
+                  });
+                  if (myMovePointer.x < startX) moveLeft(tmpAcceleration);
+                  if (myMovePointer.x > startX) moveRight(tmpAcceleration);
+                } else {
+                  this.touchMoving = false;
+
+                  var tween = this.tweens.add({
+                    targets: sliderKnob,
+                    x: 0,
+                    ease: "Power1",
+                    duration: 300,
+                  });
+                }
+              }
+            }
+          }
+
+          if (
+            this.input.pointer1.x > leftHalf ||
+            this.input.pointer2.x > leftHalf
+          ) {
+            var myJumpPointer = null;
+
+            if (
+              this.input.pointer1.x > leftHalf &&
+              this.input.pointer1.isDown
+            ) {
+              myJumpPointer = this.input.pointer1;
+            }
+            if (
+              this.input.pointer2.x > leftHalf &&
+              this.input.pointer2.isDown
+            ) {
+              myJumpPointer = this.input.pointer2;
+            }
+
+            if (myJumpPointer) {
+              this.prevPos = this.yPos;
+
+              this.yPos = myJumpPointer.y;
+
+              if (this.onLadder) {
+                this.player.setVelocityY(0);
+
+                if (Math.floor(this.prevPos) > Math.floor(this.yPos)) {
+                  if (!myMovePointer) {
+                    this.player.x = this.ladder.x;
+
+                    this.player.setVelocityX(0);
+                    this.player.setVelocityY(-100);
+                  }
+                }
+
+                if (Math.floor(this.prevPos) < Math.floor(this.yPos)) {
+                  if (!myMovePointer) {
+                    this.player.x = this.ladder.x;
+
+                    this.player.setVelocityX(0);
+                    this.player.setVelocityY(100);
+                  }
+                }
+              } else {
+                if (
+                  this.prevPos - this.yPos > this.touchJumpThreshold &&
+                  this.standing
+                ) {
+                  this.touchJump = true;
+                }
+              }
+            }
+          }
+        } else {
+          this.touchSlider.alpha = 0;
+          startX = 0;
+          this.touchMoving = false;
+
+          if (this.onLadder) {
+          }
+        }
+
+        if (
+          !cursors.right.isDown &&
+          !cursors.left.isDown &&
+          !this.touchMoving
+        ) {
+          if (
+            Math.abs(this.player.body.velocity.x) < 10 &&
+            Math.abs(this.player.body.velocity.x) > -10
+          ) {
+            this.player.setVelocityX(0);
+            this.player.setAccelerationX(0);
+          } else {
+            this.player.setAccelerationX(
+              ((this.player.body.velocity.x > 0 ? -1 : 1) *
+                gameScene.acceleration) /
+                3
+            );
+          }
+        }
+
+        var d = new Date();
+        var time = d.getTime();
+
+        if (!this.standing && this.wasStanding) {
+          this.edgeTimer = time + 100;
+        }
+
+        if (this.onLadder && !this.isTouch) {
+          this.player.setVelocityY(0);
+
+          if (cursors.up.isDown) {
+            if (!cursors.left.isDown && !cursors.right.isDown) {
+              this.player.x = this.currentLadder.x;
+
+              this.player.setVelocityX(0);
+              this.player.setVelocityY(-100);
+            }
+          }
+
+          if (
+            cursors.down.isDown &&
+            !cursors.left.isDown &&
+            !cursors.right.isDown
+          ) {
+            this.player.x = this.currentLadder.x;
+
+            this.player.setVelocityX(0);
+            this.player.setVelocityY(100);
+          }
+        }
+
+        if (
+          (this.standing || this.time <= this.edgeTimer) &&
+          (cursors.up.isDown || this.touchJump) &&
+          !this.jumping &&
+          !this.onLadder
+        ) {
+          this.player.setVelocityY(this.jumpVelocity);
+          this.jumping = true;
+        }
+
+        if (!cursors.up.isDown) {
+          if (this.standing) {
+            this.jumping = false;
+            this.touchJump = false;
+            this.prevPos = 0;
+          }
+        }
+        this.wasStanding = this.standing;
+
+        if (!this.onLadder) this.player.body.setAllowGravity(true);
+        this.onLadder = false;
+      };
+
+      function collectCoin(player, coin) {
+        coin.disableBody(false, false);
+
+        var collectCoinTween = this.tweens.add({
+          targets: coin,
+          alpha: 0.3,
+          angle: 720,
+          x: gameScene.scoreCoin.x,
+          y: gameScene.scoreCoin.y,
+          scaleX: 0.5,
+          scaleY: 0.5,
+          ease: "Linear",
+          duration: 500,
+          onComplete: function () {
+            destroyGameObject(coin);
+            gameScene.coinTweens.shift();
+          },
+        });
+
+        this.coinTweens.push(collectCoinTween);
+
+        if (this.scoreCoinTimeline) {
+          if (this.scoreCoinTimeline.progress == 1) {
+            animateScoreCoin(this);
+          }
+        } else {
+          animateScoreCoin(this);
+        }
+        gameScene.score += 10;
+        gameScene.scoreText.setText(gameScene.score);
+      }
+
+      function growHero() {
+        gameScene.player.setTexture("hero");
+
+        gameScene.player.setSize(32, 32);
+
+        gameScene.player.isBig = true;
+
+        gameScene.player.isChangingSize = false;
+      }
+
+      function shrinkHero() {
+        gameScene.player.setTexture("hero-small");
+
+        gameScene.player.setSize(22, 22);
+
+        gameScene.player.isBig = false;
+
+        gameScene.player.isChangingSize = false;
+      }
+
+      function collectMushroom(player, mushroom) {
+        player.body.velocity.x = 0;
+        player.body.velocity.y = 0;
+
+        player.isChangingSize = true;
+
+        mushroom.disableBody(false, false);
+
+        var tween = this.tweens.add({
+          targets: player,
+          scaleX: 1.5,
+          scaleY: 1.5,
+          yoyo: 1,
+          repeat: 1,
+          ease: "Linear",
+          duration: 100,
+          onComplete: function () {
+            growHero();
+          },
+        });
+
+        var tween = this.tweens.add({
+          targets: mushroom,
+          alpha: 0.3,
+          angle: 90,
+          scaleX: 0.3,
+          scaleY: 0.3,
+          ease: "Linear",
+          duration: 500,
+          onComplete: function () {
+            destroyGameObject(mushroom);
+          },
+        });
+      }
+
+      function hitQuestionMarkBlock(player, block) {
+        if (block.body.touching.down && !block.hit) {
+          block.hit = true;
+
+          block.powerup.visible = true;
+
+          var tween = this.tweens.add({
+            targets: block.powerup,
+            y: "-=24",
+            ease: "Linear",
+            duration: 300,
+            onComplete: function () {
+              emptyQuestionBlock(block);
+            },
+          });
+
+          var tween = this.tweens.add({
+            targets: block,
+            y: "-=5",
+            ease: "Linear",
+            yoyo: true,
+            duration: 100,
+          });
+        }
+      }
+
+      function emptyQuestionBlock(block) {
+        block.setTexture("empty-box");
+
+        block.powerup.enableBody = true;
+
+        block.powerup.body.setAllowGravity(true);
+
+        if (Math.floor(Math.random() * 1)) block.powerup.setVelocityX(-80);
+        else block.powerup.setVelocityX(80);
+      }
+
+      function goInvincibile(player, invicibility) {
+        invicibility.disableBody(false, false);
+
+        player.body.maxVelocity.x = this.superPlayerSpeed;
+
+        gameScene.emitter.resume();
+
+        this.tweens.addCounter({
+          from: 0,
+          to: 100,
+          duration: 500,
+          yoyo: true,
+          repeat: 5,
+          onUpdate: function (tween) {
+            var value = Math.floor(tween.getValue());
+            var newColorObject =
+              Phaser.Display.Color.Interpolate.ColorWithColor(
+                gameScene.heroColor,
+                gameScene.invincibleColor,
+                100,
+                value
+              );
+            var color = Phaser.Display.Color.GetColor(
+              newColorObject.r,
+              newColorObject.g,
+              newColorObject.b
+            );
+            player.setTint(color);
+          },
+          onComplete: function () {
+            resetInvincibility();
+          },
+        });
+
+        var tween = this.tweens.add({
+          targets: invicibility,
+          alpha: 0.3,
+          angle: 90,
+          scaleX: 0.3,
+          scaleY: 0.3,
+          ease: "Linear",
+          duration: 500,
+          onComplete: function () {
+            destroyGameObject(invicibility);
+          },
+        });
+
+        player.invincible = true;
+      }
+
+      function resetInvincibility() {
+        gameScene.player.invincible = false;
+
+        gameScene.player.body.maxVelocity.x = gameScene.maxPlayerSpeed;
+
+        gameScene.emitter.pause();
+        gameScene.emitter.killAll();
+      }
+
+      function animateScoreCoin(game) {
+        this.scoreCoinTimeline = game.tweens.timeline({
+          targets: gameScene.scoreCoin,
+          duration: 100,
+          tweens: [
+            {
+              scaleX: 0.8,
+              scaleY: 0.8,
+              angle: "+=45",
+            },
+            {
+              scaleX: 0.5,
+              scaleY: 0.5,
+              angle: "+=45",
+            },
+          ],
+        });
+      }
+
+      function destroyGameObject(gameObject) {
+        gameObject.destroy();
+      }
+
+      var config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 400,
+        transparent: true,
+        physics: {
+          default: "arcade",
+          arcade: {
+            fps: 120,
+            gravity: { y: 300 },
+          },
+        },
+
+        scene: [titleScreen, gameScene, endScreen],
+      };
+      var game = new Phaser.Game(config);
+    </script>
+  </body>
+</html>
