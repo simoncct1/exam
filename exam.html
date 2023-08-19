@@ -72,6 +72,8 @@
         jumpVelocity = -165,
         jumpVelocitySmall = -165,
         jumpVelocityBig = -330,
+        oneWayPlatforms,
+        collapsingPlatforms,
         questionMarkBlock;
 
       var game = new Phaser.Game(config);
@@ -95,6 +97,9 @@
         this.load.image("hero-small", "hero-16.jpg");
         this.load.image("question-mark-block", "question-mark-block.jpg");
         this.load.image("empty-box", "empty-box.jpg");
+        this.load.image("one-way-platform", "one-way-platform.jpg");
+        this.load.image("one-way-platform-large", "one-way-platform-large.jpg");
+        this.load.image("collapsing-platform", "collapsing-platform.jpg");
       }
 
       function create() {
@@ -112,6 +117,15 @@
         platforms.create(400, 400, "ground").setScale(2).refreshBody();
         platforms.create(150, 240, "ground");
         platforms.create(860, 190, "ground");
+
+        oneWayPlatforms = this.physics.add.staticGroup();
+        oneWayPlatforms.create(1400, 352, "one-way-platform-large");
+        oneWayPlatforms.create(1400, 320, "one-way-platform");
+
+        collapsingPlatforms = this.physics.add.staticGroup();
+        collapsingPlatforms.create(1270, 290, "collapsing-platform");
+        collapsingPlatforms.create(1180, 256, "collapsing-platform");
+        collapsingPlatforms.create(1093, 222, "collapsing-platform");
 
         player = this.physics.add.sprite(40, 350, "hero-small");
         player.setCollideWorldBounds(true);
@@ -232,7 +246,21 @@
         this.physics.add.collider(shell, platforms, shellWallHit, null, this);
         this.physics.add.collider(shell, spikes, destroyShell, null, this);
         this.physics.add.collider(invicibility, platforms);
+        this.physics.add.collider(
+          player,
+          oneWayPlatforms,
+          null,
+          checkOneWay,
+          this
+        );
         this.physics.add.collider(mushroom, platforms);
+        this.physics.add.collider(
+          player,
+          collapsingPlatforms,
+          shakePlatform,
+          checkOneWay,
+          this
+        );
         this.physics.add.collider(
           player,
           questionMarkBlock,
@@ -252,6 +280,50 @@
         this.physics.add.overlap(player, coins, collectCoin, null, this);
         this.physics.add.overlap(player, baddies, hitBaddie, null, this);
         buildTouchSlider(this);
+      }
+
+      function destroyPlatform(platform) {
+        var tween = this.tweens.add({
+          targets: platform,
+          alpha: 0,
+          y: "+=25",
+          ease: "Linear",
+          duration: 100,
+          onComplete: function () {
+            destroyGameObject(platform);
+          },
+        });
+      }
+
+      function shakePlatform(player, platform) {
+        if (player.body.blocked.down) {
+          this.cameras.main.shake(200, 0.001);
+
+          var ourScene = this;
+
+          var tween = this.tweens.add({
+            targets: platform,
+            yoyo: true,
+            repeat: 10,
+            x: {
+              from: platform.x,
+              to: platform.x + 2 * 1,
+            },
+            ease: "Linear",
+            duration: 50,
+            onComplete: function () {
+              destroyPlatform.call(ourScene, platform);
+            },
+          });
+        }
+      }
+
+      function checkOneWay(player, oneway) {
+        if (player.y < oneway.y) {
+          return true;
+        }
+
+        return false;
       }
 
       function emptyQuestionBlock(block) {
