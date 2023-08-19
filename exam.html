@@ -124,7 +124,7 @@
 
         cursors = this.input.keyboard.createCursorKeys();
 
-        shell = this.physics.add.sprite(700, 350, "shell");
+        shell = this.physics.add.sprite(1500, 350, "shell");
 
         coins = this.physics.add.group({
           key: "coin",
@@ -157,7 +157,7 @@
 
         ladders = this.physics.add.staticGroup();
         ladders.enableBody = true;
-        ladder = ladders.create(268, 296, "ladder");
+        ladder = ladders.create(365, 296, "ladder");
         ladder.body.immovable = true;
         this.physics.add.overlap(player, ladders, isOnLadder, null, this);
 
@@ -180,7 +180,7 @@
         heart3 = this.add.sprite(680, 38, "heart-filled");
         hearts = [heart1, heart2, heart3];
 
-        invicibility = this.physics.add.sprite(220, 60, "powerup");
+        invicibility = this.physics.add.sprite(240, 60, "powerup");
         invicibility.setOrigin(0.5, 0.5);
 
         var particles = this.add.particles("dust");
@@ -910,7 +910,7 @@
         coin.disableBody(true, true);
 
         score += 10;
-        scoreText.setText("Score: " + score);
+        scoreText.setText(score);
         var collectCoinTween = this.tweens.add({
           targets: coin,
           alpha: 0.3,
