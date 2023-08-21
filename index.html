@@ -127,10 +127,10 @@
         this.maxHearts = 3;
         this.vulnerableTime = 1000;
         this.acceleration = 600;
-        this.maxPlayerSpeed = 200;
-        this.superPlayerSpeed = 400;
-        this.jumpVelocity = -165;
-        this.jumpVelocitySmall = -165;
+        this.maxPlayerSpeed = 190;
+        this.superPlayerSpeed = 350;
+        this.jumpVelocity = -185;
+        this.jumpVelocitySmall = -185;
         this.jumpVelocityBig = -330;
         this.standing = true;
         this.wasStanding = false;
@@ -420,7 +420,7 @@
         var particles = this.add.particles('dust');
         this.emitter = particles.createEmitter();
         this.emitter.setPosition(this.player.x, this.player.y);
-        this.emitter.setSpeed(150);
+        this.emitter.setSpeed(100);
         this.emitter.setBlendMode(Phaser.BlendModes.ADD);
         //turn it off for now until we are invincible
         this.emitter.pause();
@@ -612,10 +612,10 @@
     gameScene.setupLights = function() {
         this.lights.enable();
         //set ambient colour whole scene. This is set to quite dark for contrast with lights
-        this.lights.setAmbientColor(0x666666);
+        this.lights.setAmbientColor(0x999999);
 
         //light at entrance to level
-        this.lights.addLight(0, 340, 300).setColor(0xffffff).setIntensity(3.0);
+        this.lights.addLight(-10, 340, 300).setColor(0x50C878).setIntensity(4);
         //lava lights
         this.lights.addLight(440, 360, 100).setColor(0xeb840b).setIntensity(1.0);
         this.lights.addLight(540, 360, 100).setColor(0xffea00).setIntensity(1.5);
